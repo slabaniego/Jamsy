@@ -3,10 +3,10 @@ package ca.sheridancollege.jamsy.services;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.fasterxml.jackson.databind.JsonNode;
+//import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
+//import java.io.IOException;
 import java.util.*;
 
 // Add this import
@@ -18,20 +18,23 @@ public class SpotifyService {
     private static final String CLIENT_ID = "a889ff03eaa84050b3d323debcf1498f";
     private static final String CLIENT_SECRET = "1b8849fc75db4306bf791e3617e7a195";
 
+    @SuppressWarnings("null")
     public String getUserAccessToken(String code) {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         String body = "grant_type=authorization_code&code=" + code +
-                      "&redirect_uri=http://localhost:8080/callback&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET;
+                      "&redirect_uri=http://localhost:8080/login/oauth2/code/spotify&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET;
 
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
+        @SuppressWarnings("rawtypes")
         ResponseEntity<Map> response = restTemplate.exchange("https://accounts.spotify.com/api/token", HttpMethod.POST, entity, Map.class);
 
         return (String) response.getBody().get("access_token");
     }
 
+    @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getTracksFromMultipleSources(String accessToken) {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
@@ -48,16 +51,19 @@ public class SpotifyService {
         // 1. Fetch ALL Liked Songs (with pagination)
         String likedSongsUrl = "https://api.spotify.com/v1/me/tracks?limit=50";
         while (likedSongsUrl != null) {
+            @SuppressWarnings("rawtypes")
             ResponseEntity<Map> likedSongsResponse = restTemplate.exchange(likedSongsUrl, HttpMethod.GET, entity, Map.class);
             allTracks.addAll(extractTracks(likedSongsResponse.getBody(), accountCreationDate, "liked_songs"));
 
             // Check if there are more pages
+            @SuppressWarnings("null")
             String nextPageUrl = (String) likedSongsResponse.getBody().get("next");
             likedSongsUrl = nextPageUrl;
         }
 
         // 2. Fetch Top Tracks (limit: 50)
         String topTracksUrl = "https://api.spotify.com/v1/me/top/tracks?limit=50&time_range=medium_term";
+        @SuppressWarnings("rawtypes")
         ResponseEntity<Map> topTracksResponse = restTemplate.exchange(topTracksUrl, HttpMethod.GET, entity, Map.class);
         allTracks.addAll(extractTracks(topTracksResponse.getBody(), accountCreationDate, "top_tracks"));
 
@@ -68,6 +74,7 @@ public class SpotifyService {
         List<Map<String, Object>> recentlyPlayedTracks = new ArrayList<>();
 
         while (recentlyPlayedTracks.size() < recentlyPlayedLimit) {
+            @SuppressWarnings("rawtypes")
             ResponseEntity<Map> recentlyPlayedResponse = restTemplate.exchange(recentlyPlayedUrl, HttpMethod.GET, entity, Map.class);
             List<Map<String, Object>> batchTracks = extractTracks(recentlyPlayedResponse.getBody(), accountCreationDate, "recently_played");
             recentlyPlayedTracks.addAll(batchTracks);
@@ -97,13 +104,16 @@ public class SpotifyService {
 
         // Fetch the first 50 saved tracks
         String likedSongsUrl = "https://api.spotify.com/v1/me/tracks?limit=50";
+        @SuppressWarnings("rawtypes")
         ResponseEntity<Map> likedSongsResponse = restTemplate.exchange(likedSongsUrl, HttpMethod.GET, entity, Map.class);
+        @SuppressWarnings("unchecked")
         Map<String, Object> responseBody = likedSongsResponse.getBody();
 
         if (responseBody == null || responseBody.get("items") == null) {
             return null; // Return null if response or items is null
         }
 
+        @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) responseBody.get("items");
 
         // Find the oldest track based on the "added_at" field
@@ -128,12 +138,14 @@ public class SpotifyService {
             return tracks; // Return empty list if response or items is null
         }
 
+        @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");
         for (Map<String, Object> item : items) {
             if (item == null || item.get("track") == null) {
                 continue; // Skip null items or tracks
             }
 
+            @SuppressWarnings("unchecked")
             Map<String, Object> track = (Map<String, Object>) item.get("track");
             if (track == null) {
                 continue; // Skip null tracks
@@ -169,6 +181,7 @@ public class SpotifyService {
                 continue; // Skip null tracks
             }
 
+            @SuppressWarnings("unchecked")
             Map<String, Object> externalIds = (Map<String, Object>) track.get("external_ids");
             String isrc = externalIds != null ? (String) externalIds.getOrDefault("isrc", track.get("id").toString()) : track.get("id").toString();
             uniqueTracks.put(isrc, track);
@@ -196,6 +209,7 @@ public class SpotifyService {
         // Get artist details in batches
         Set<String> artistIds = new HashSet<>();
         for (Map<String, Object> track : tracks) {
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> artists = (List<Map<String, Object>>) track.get("artists");
             for (Map<String, Object> artist : artists) {
                 artistIds.add((String) artist.get("id"));
@@ -207,7 +221,9 @@ public class SpotifyService {
         for (int i = 0; i < artistIdList.size(); i += 50) {
             List<String> batch = artistIdList.subList(i, Math.min(i + 50, artistIdList.size()));
             String artistUrl = "https://api.spotify.com/v1/artists?ids=" + String.join(",", batch);
+            @SuppressWarnings("rawtypes")
             ResponseEntity<Map> response = restTemplate.exchange(artistUrl, HttpMethod.GET, entity, Map.class);
+            @SuppressWarnings({ "unchecked", "null" })
             List<Map<String, Object>> artists = (List<Map<String, Object>>) response.getBody().get("artists");
             for (Map<String, Object> artist : artists) {
                 artistDetails.put((String) artist.get("id"), artist);
@@ -221,12 +237,14 @@ public class SpotifyService {
             enrichedTrack.put("name", track.get("name"));
 
             // Extract artists
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> artists = (List<Map<String, Object>>) track.get("artists");
             enrichedTrack.put("artists", artists.stream()
                     .map(artist -> (String) artist.get("name"))
                     .collect(Collectors.toList()));
 
             // Extract ISRC
+            @SuppressWarnings("unchecked")
             Map<String, Object> externalIds = (Map<String, Object>) track.get("external_ids");
             enrichedTrack.put("isrc", externalIds != null ? (String) externalIds.getOrDefault("isrc", "N/A") : "N/A");
 
@@ -235,6 +253,7 @@ public class SpotifyService {
             for (Map<String, Object> artist : artists) {
                 Map<String, Object> artistDetail = artistDetails.get(artist.get("id"));
                 if (artistDetail != null) {
+                    @SuppressWarnings("unchecked")
                     List<String> artistGenres = (List<String>) artistDetail.get("genres");
                     if (artistGenres != null) {
                         genres.addAll(artistGenres);
@@ -250,7 +269,9 @@ public class SpotifyService {
             enrichedTrack.put("language", detectLanguage((String) track.get("name")));
 
             // Extract album cover
+            @SuppressWarnings("unchecked")
             Map<String, Object> album = (Map<String, Object>) track.get("album");
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> images = (List<Map<String, Object>>) album.get("images");
             enrichedTrack.put("album_cover", images != null && !images.isEmpty() ? (String) images.get(0).get("url") : "No image available");
 

@@ -1,3 +1,18 @@
+<!-- <!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Spotify Playlist Generator - Login</title>
+</head>
+<body>
+    <h1>Welcome to Spotify Playlist Generator</h1>
+    <p>Please log in with your Spotify account to continue.</p>
+    <a href="https://accounts.spotify.com/authorize?client_id=024491d2f5bb43fb93ff6c69eacf6ab8&response_type=code&redirect_uri=http://localhost:8080/callback&scope=user-top-read%20user-library-read%20user-read-recently-played">
+        Connect Spotify
+    </a>
+</body>
+</html> -->
+
+
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -6,8 +21,6 @@
 <body>
     <h1>Welcome to Spotify Playlist Generator</h1>
     <p>Please log in with your Spotify account to continue.</p>
-    <a href="https://accounts.spotify.com/authorize?client_id=a889ff03eaa84050b3d323debcf1498f&response_type=code&redirect_uri=http://localhost:8080/callback&scope=user-top-read user-library-read user-read-recently-played">
-        Connect Spotify
-    </a>
+    <a href="/oauth2/authorization/spotify">Connect Spotify</a>
 </body>
 </html>
