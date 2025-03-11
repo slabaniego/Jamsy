@@ -1,4 +1,4 @@
-package ca.sheridancollege.labanies.services;
+package ca.sheridancollege.jamsy.services;
 
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;

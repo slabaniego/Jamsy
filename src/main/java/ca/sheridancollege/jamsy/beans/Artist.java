@@ -1,4 +1,4 @@
-package ca.sheridancollege.labanies.beans;
+package ca.sheridancollege.jamsy.beans;
 
 import java.util.List;
 

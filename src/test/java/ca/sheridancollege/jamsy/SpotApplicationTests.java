@@ -1,4 +1,4 @@
-package ca.sheridancollege.labanies;
+package ca.sheridancollege.jamsy;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

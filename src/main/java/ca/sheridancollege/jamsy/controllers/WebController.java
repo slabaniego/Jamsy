@@ -1,11 +1,11 @@
-package ca.sheridancollege.labanies.controllers;
+package ca.sheridancollege.jamsy.controllers;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import ca.sheridancollege.labanies.services.SpotifyService;
+import ca.sheridancollege.jamsy.services.SpotifyService;
 import jakarta.servlet.http.HttpSession;
 
 import java.util.List;
