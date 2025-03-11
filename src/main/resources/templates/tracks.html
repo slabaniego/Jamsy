@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Recommended Non-Popular Tracks</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        img {
+            width: 100px;
+            height: 100px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Recommended Non-Popular Tracks</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Track</th>
+                <th>Artists</th>
+                <th>ISRC</th>
+                <th>Genres</th>
+                <th>Popularity</th>
+                <th>Language</th>
+                <th>Album Cover</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="track, iterStat : ${tracks}">
+                <td th:text="${iterStat.index + 1}"></td>
+                <td th:text="${track.name}"></td>
+                <td>
+                    <span th:each="artist, artistStat : ${track.artists}">
+                        <span th:text="${artist}"></span>
+                        <span th:if="${!artistStat.last}">, </span>
+                    </span>
+                </td>
+                <td th:text="${track.isrc}"></td>
+                <td>
+                    <span th:each="genre, genreStat : ${track.genres}">
+                        <span th:text="${genre}"></span>
+                        <span th:if="${!genreStat.last}">, </span>
+                    </span>
+                </td>
+                <td th:text="${track.popularity}"></td>
+                <td th:text="${track.language}"></td>
+                <td><img th:src="${track.album_cover}" alt="Album Cover"></td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
