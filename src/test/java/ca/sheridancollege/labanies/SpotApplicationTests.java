@@ -1,4 +1,4 @@
-package ca.sheridancollege.atina;
+package ca.sheridancollege.labanies;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
