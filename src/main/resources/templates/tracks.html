@@ -1,53 +1,166 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Recommended Non-Popular Tracks</title>
+    <title>Song Recommendations</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        img {
-            width: 100px;
-            height: 100px;
+        body {
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        .song-container {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .album-cover {
+            width: 200px;
+            height: 200px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .song-name {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .artist-name {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .actions {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        /*
+        .actions button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
             border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .actions button.like {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .actions button.unlike {
+            background-color: #f44336;
+            color: white;
+        }
+        .actions button:hover {
+            opacity: 0.9;
+        }*/
+        audio {
+            width: 100%;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
-    <h1>Recommended Non-Popular Tracks</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Track</th>
-                <th>Artists</th>
-                <th>ISRC</th>
-                <th>Genres</th>
-                <th>Popularity</th>
-                <th>Language</th>
-                <th>Album Cover</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="track, iterStat : ${tracks}">
-                <td th:text="${iterStat.index + 1}"></td>
-                <td th:text="${track.name}"></td>
-                <td>
-                    <span th:each="artist, artistStat : ${track.artists}">
-                        <span th:text="${artist}"></span>
-                        <span th:if="${!artistStat.last}">, </span>
-                    </span>
-                </td>
-                <td th:text="${track.isrc}"></td>
-                <td>
-                    <span th:each="genre, genreStat : ${track.genres}">
-                        <span th:text="${genre}"></span>
-                        <span th:if="${!genreStat.last}">, </span>
-                    </span>
-                </td>
-                <td th:text="${track.popularity}"></td>
-                <td th:text="${track.language}"></td>
-                <td><img th:src="${track.album_cover}" alt="Album Cover"></td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="song-container">
+        <!-- Album Cover -->
+        <img th:src="${track.album_cover}" alt="Album Cover" class="album-cover">
+
+        <!-- Song Name -->
+        <div class="song-name" th:text="${track.name}"></div>
+
+        <!-- Artist Name -->
+        <div class="artist-name" th:text="${track.artists}"></div>
+
+        <!-- Song Player -->
+        <audio controls th:if="${track.preview_url != null}">
+            <source th:src="${track.preview_url}" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+        <span th:if="${track.preview_url == null}">No preview available</span>
+
+        <!-- Like/Unlike Buttons -->
+        <div class="actions">
+            <button class="like" onclick="handleAction('like')">Like</button>
+            <button class="unlike" onclick="handleAction('unlike')">Unlike</button>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+    var tracks = /*[[${tracks}]]*/ [];
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        console.log("Document loaded, initializing script...");
+        initializePage();
+        updateTrack(tracks[0]);
+    });
+
+    let currentTrackIndex = 0;
+
+    function initializePage() {
+        if (tracks.length > 0) {
+            console.log("Tracks available:", tracks);
+            updateTrack(tracks[currentTrackIndex]);
+        } else {
+            console.error("No tracks found!");
+        }
+    }
+
+    function handleAction(action) {
+        if (currentTrackIndex >= tracks.length) return;
+
+        const currentTrack = tracks[currentTrackIndex];
+        if (!currentTrack) return;
+
+        console.log("Action:", action, "Track:", currentTrack.name);
+
+        fetch('/handle-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isrc: currentTrack.isrc, songName: currentTrack.name, action })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentTrackIndex++;
+                if (currentTrackIndex < tracks.length) {
+                    updateTrack(tracks[currentTrackIndex]);
+                } else {
+                    window.location.href = "/song-actions";
+                }
+            }
+        })
+        .catch(error => console.error("Error:", error));
+    }
+
+    function updateTrack(track) {
+        console.log("Updating track:", track);
+
+        document.querySelector('.album-cover').src = track.album_cover;
+        document.querySelector('.song-name').textContent = track.name;
+        document.querySelector('.artist-name').textContent = track.artists.join(', ');
+
+        const audioElement = document.querySelector('audio');
+
+        if (track.preview_url) {
+            audioElement.src = track.preview_url;
+            audioElement.style.display = 'block';
+            audioElement.loop = true;  // Enable looping
+            audioElement.play().catch(error => console.error("Audio playback error:", error));
+        } else {
+            audioElement.style.display = 'none';
+        }
+    }
+
+</script>
+
 </body>
 </html>
