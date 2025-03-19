@@ -17,18 +17,19 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(authorizeRequests ->
-                authorizeRequests
-                    .requestMatchers("/", "/login", "/error", "/oauth2/**").permitAll()
-                    .anyRequest().authenticated()
-            )
-            .oauth2Login(oauth2 -> oauth2
-                .loginPage("/login")
-                .defaultSuccessUrl("/tracks", true)
-            );
-        return http.build();
+    	http
+        .csrf(csrf -> csrf.disable())  // CSRF disabled for H2 and POSTs
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**").permitAll()
+            // Keep /tracks, /like, /unlike protected so only logged-in users can use them
+            .anyRequest().authenticated()
+        )
+        .headers(headers -> headers.frameOptions(frame -> frame.disable()))  // H2 needs this
+        .oauth2Login(oauth2 -> oauth2
+            .loginPage("/login")
+            .defaultSuccessUrl("/tracks", true)
+        );
+    return http.build();
     }
 
     @Bean
