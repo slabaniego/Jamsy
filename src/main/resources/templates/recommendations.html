@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Recommended Songs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f4f9;
+            padding: 30px;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .base-track {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+
+        .recommendation-list {
+            max-width: 700px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .track-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .track-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .track-name {
+            font-weight: 500;
+        }
+
+        .artist-name {
+            font-size: 14px;
+            color: #777;
+        }
+
+        .listen-link {
+            font-size: 14px;
+            color: #2196F3;
+            text-decoration: none;
+        }
+
+        .listen-link:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            text-align: center;
+            color: #f44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Recommended Songs</h1>
+
+    <div class="base-track" th:if="${baseTrack != null}">
+        Because you liked <strong th:text="${baseTrack.songName}"></strong>
+        by <strong th:text="${baseTrack.artist}"></strong>...
+    </div>
+
+    <div th:if="${error}" class="error-message" th:text="${error}"></div>
+
+    <div class="recommendation-list" th:if="${recommendations}">
+        <div class="track-item" th:each="rec : ${recommendations}">
+            <div class="track-info">
+                <div class="track-name" th:text="${rec.name}">Track Name</div>
+                <div class="artist-name" th:text="${rec.artist.name}">Artist</div>
+            </div>
+            <a class="listen-link"
+               th:href="${rec.url}"
+               target="_blank">Listen</a>
+        </div>
+    </div>
+
+</body>
+</html>

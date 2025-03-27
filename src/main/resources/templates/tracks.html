@@ -1,166 +1,117 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Song Recommendations</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <title>Track Recommendations</title>
+    <meta charset="UTF-8">
     <style>
         body {
-            font-family: 'Poppins', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f4f4f9;
-        }
-        .song-container {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
             text-align: center;
+            padding: 40px;
+        }
+
+        #trackCard {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        .album-cover {
-            width: 200px;
-            height: 200px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .song-name {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 10px 0;
-        }
-        .artist-name {
-            font-size: 18px;
-            color: #666;
-            margin-bottom: 20px;
-        }
-        .actions {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-        }
-        /*
-        .actions button {
-            padding: 10px 20px;
-            font-size: 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .actions button.like {
-            background-color: #4CAF50;
-            color: white;
-        }
-        .actions button.unlike {
-            background-color: #f44336;
-            color: white;
-        }
-        .actions button:hover {
-            opacity: 0.9;
-        }*/
-        audio {
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            display: inline-block;
+            max-width: 400px;
             width: 100%;
-            margin-top: 20px;
+        }
+
+        img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 25px;
+            border: none;
+            border-radius: 6px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        audio {
+            margin-top: 15px;
+            width: 100%;
         }
     </style>
 </head>
 <body>
-    <div class="song-container">
-        <!-- Album Cover -->
-        <img th:src="${track.album_cover}" alt="Album Cover" class="album-cover">
 
-        <!-- Song Name -->
-        <div class="song-name" th:text="${track.name}"></div>
+<h1>🎶 Discover New Tracks</h1>
 
-        <!-- Artist Name -->
-        <div class="artist-name" th:text="${track.artists}"></div>
+<div id="trackContainer">
+    <div id="trackCard">
+        <img id="albumCover" src="" alt="Album Cover" />
+        <h2 id="trackName"></h2>
+        <p id="artistName"></p>
+        <p id="genreText"></p>
+        <audio id="previewPlayer" controls autoplay></audio>
 
-        <!-- Song Player -->
-        <audio controls th:if="${track.preview_url != null}">
-            <source th:src="${track.preview_url}" type="audio/mpeg">
-            Your browser does not support the audio element.
-        </audio>
-        <span th:if="${track.preview_url == null}">No preview available</span>
-
-        <!-- Like/Unlike Buttons -->
-        <div class="actions">
-            <button class="like" onclick="handleAction('like')">Like</button>
-            <button class="unlike" onclick="handleAction('unlike')">Unlike</button>
+        <div>
+            <button onclick="handleAction('like')">👍 Like</button>
+            <button onclick="handleAction('unlike')">👎 Unlike</button>
         </div>
     </div>
+</div>
 
-    <script th:inline="javascript">
-    var tracks = /*[[${tracks}]]*/ [];
-</script>
+<script th:inline="javascript">
+    // Assign the JSON string and parse it
+    let tracks = [[${tracksJson}]];
+    if (typeof tracks === 'string') {
+        console.warn("🚨 tracks is a string, parsing JSON...");
+        tracks = JSON.parse(tracks);
+    }
 
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        console.log("Document loaded, initializing script...");
-        initializePage();
-        updateTrack(tracks[0]);
-    });
+    let currentIndex = 0;
 
-    let currentTrackIndex = 0;
+    function displayTrack(index) {
+        const track = tracks[index];
+        if (!track) return;
 
-    function initializePage() {
-        if (tracks.length > 0) {
-            console.log("Tracks available:", tracks);
-            updateTrack(tracks[currentTrackIndex]);
-        } else {
-            console.error("No tracks found!");
-        }
+        document.getElementById("trackName").innerText = track.name || "Unknown";
+        document.getElementById("artistName").innerText = track.artists?.join(", ") || "Unknown Artist";
+        document.getElementById("albumCover").src = track.albumCover || "";
+        document.getElementById("genreText").innerText = track.genres?.join(", ") || "Genres: N/A";
+        document.getElementById("previewPlayer").src = track.previewUrl || "";
     }
 
     function handleAction(action) {
-        if (currentTrackIndex >= tracks.length) return;
-
-        const currentTrack = tracks[currentTrackIndex];
-        if (!currentTrack) return;
-
-        console.log("Action:", action, "Track:", currentTrack.name);
-
+        const track = tracks[currentIndex];
         fetch('/handle-action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ isrc: currentTrack.isrc, songName: currentTrack.name, action })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                currentTrackIndex++;
-                if (currentTrackIndex < tracks.length) {
-                    updateTrack(tracks[currentTrackIndex]);
-                } else {
-                    window.location.href = "/song-actions";
-                }
+            body: JSON.stringify({
+                isrc: track.isrc,
+                songName: track.name,
+                artist: track.artists[0],
+                genres: track.genres,
+                action: action
+            })
+        }).then(() => {
+            currentIndex++;
+            if (currentIndex < tracks.length) {
+                displayTrack(currentIndex);
+            } else {
+                document.getElementById("trackContainer").innerHTML = "<h2>You're all done! 🎉</h2>";
             }
-        })
-        .catch(error => console.error("Error:", error));
+        });
     }
 
-    function updateTrack(track) {
-        console.log("Updating track:", track);
-
-        document.querySelector('.album-cover').src = track.album_cover;
-        document.querySelector('.song-name').textContent = track.name;
-        document.querySelector('.artist-name').textContent = track.artists.join(', ');
-
-        const audioElement = document.querySelector('audio');
-
-        if (track.preview_url) {
-            audioElement.src = track.preview_url;
-            audioElement.style.display = 'block';
-            audioElement.loop = true;  // Enable looping
-            audioElement.play().catch(error => console.error("Audio playback error:", error));
-        } else {
-            audioElement.style.display = 'none';
-        }
-    }
-
+    window.onload = () => displayTrack(currentIndex);
 </script>
+
 
 </body>
 </html>

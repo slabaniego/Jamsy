@@ -1,6 +1,5 @@
 package ca.sheridancollege.jamsy.security;
 
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,19 +16,19 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    	http
-        .csrf(csrf -> csrf.disable())  // CSRF disabled for H2 and POSTs
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**").permitAll()
-            // Keep /tracks, /like, /unlike protected so only logged-in users can use them
-            .anyRequest().authenticated()
-        )
-        .headers(headers -> headers.frameOptions(frame -> frame.disable()))  // H2 needs this
-        .oauth2Login(oauth2 -> oauth2
-            .loginPage("/login")
-            .defaultSuccessUrl("/tracks", true)
-        );
-    return http.build();
+        http
+            .csrf(csrf -> csrf.disable())  // Disable CSRF for H2 + POSTs
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**", "/filters").permitAll()
+                .anyRequest().authenticated()
+            )
+            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+            .oauth2Login(oauth2 -> oauth2
+                .loginPage("/login") // Your custom login screen
+                .defaultSuccessUrl("/filters", true) // ✅ Redirect to filters.html after Spotify login
+            );
+
+        return http.build();
     }
 
     @Bean
