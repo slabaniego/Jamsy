@@ -1,5 +1,6 @@
 package ca.sheridancollege.jamsy.services;
 
+import ca.sheridancollege.jamsy.beans.Track;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -12,15 +13,24 @@ public class SpotifyService {
 
     private static final String CLIENT_ID = "a889ff03eaa84050b3d323debcf1498f";
     private static final String CLIENT_SECRET = "1b8849fc75db4306bf791e3617e7a195";
-    private static final String DEEZER_API_URL = "https://api.deezer.com";
+    private static final String SPOTIFY_API_URL = "https://api.spotify.com/v1";
+
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final DeezerService deezerService;
+    private final LastFmService lastFmService;
+
+    public SpotifyService(LastFmService last, DeezerService deezerService) {
+        this.deezerService = deezerService;
+        this.lastFmService = last;
+    }
 
     public String getUserAccessToken(String code) {
-        RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         String body = "grant_type=authorization_code&code=" + code +
-                      "&redirect_uri=http://localhost:8080/login/oauth2/code/spotify&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET;
+                "&redirect_uri=http://localhost:8080/login/oauth2/code/spotify" +
+                "&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET;
 
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
         ResponseEntity<Map> response = restTemplate.exchange("https://accounts.spotify.com/api/token", HttpMethod.POST, entity, Map.class);
@@ -28,75 +38,46 @@ public class SpotifyService {
         return (String) response.getBody().get("access_token");
     }
 
-    public List<Map<String, Object>> getTracksFromMultipleSources(String accessToken) {
-        RestTemplate restTemplate = new RestTemplate();
+    public List<Track> getTopTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
-
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        List<Map<String, Object>> allTracks = new ArrayList<>();
+        String url = "https://api.spotify.com/v1/me/top/tracks?limit=50";
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 
-        // Fetch Liked Songs
-        String likedSongsUrl = "https://api.spotify.com/v1/me/tracks?limit=50";
-        while (likedSongsUrl != null) {
-            ResponseEntity<Map> likedSongsResponse = restTemplate.exchange(likedSongsUrl, HttpMethod.GET, entity, Map.class);
-            allTracks.addAll(extractTracks(likedSongsResponse.getBody(), "liked_songs"));
-
-            String nextPageUrl = (String) likedSongsResponse.getBody().get("next");
-            likedSongsUrl = nextPageUrl;
-        }
-
-        // Fetch Top Tracks
-        String topTracksUrl = "https://api.spotify.com/v1/me/top/tracks?limit=50&time_range=medium_term";
-        ResponseEntity<Map> topTracksResponse = restTemplate.exchange(topTracksUrl, HttpMethod.GET, entity, Map.class);
-        allTracks.addAll(extractTracks(topTracksResponse.getBody(), "top_tracks"));
-
-        // Fetch Recently Played Tracks
-        int recentlyPlayedLimit = 200;
-        int batchSize = 50;
-        String recentlyPlayedUrl = "https://api.spotify.com/v1/me/player/recently-played?limit=" + batchSize;
-        List<Map<String, Object>> recentlyPlayedTracks = new ArrayList<>();
-
-        while (recentlyPlayedTracks.size() < recentlyPlayedLimit) {
-            ResponseEntity<Map> recentlyPlayedResponse = restTemplate.exchange(recentlyPlayedUrl, HttpMethod.GET, entity, Map.class);
-            List<Map<String, Object>> batchTracks = extractTracks(recentlyPlayedResponse.getBody(), "recently_played");
-            recentlyPlayedTracks.addAll(batchTracks);
-
-            if (batchTracks.size() < batchSize) {
-                break;
-            }
-
-            String lastTimestamp = (String) batchTracks.get(batchTracks.size() - 1).get("played_at");
-            recentlyPlayedUrl = "https://api.spotify.com/v1/me/player/recently-played?limit=" + batchSize + "&before=" + lastTimestamp;
-        }
-
-        allTracks.addAll(recentlyPlayedTracks);
-
-        return allTracks;
+        List<Track> tracks = extractTrackItems(response.getBody());
+        System.out.println("Getting top tracks");
+        return applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
     }
 
-    private List<Map<String, Object>> extractTracks(Map<String, Object> response, String source) {
-        List<Map<String, Object>> tracks = new ArrayList<>();
-        if (response == null || response.get("items") == null) {
-            return tracks;
-        }
+    private List<Track> extractTrackItems(Map<String, Object> response) {
+        List<Track> tracks = new ArrayList<>();
+        if (response == null || !response.containsKey("items")) return tracks;
 
         List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");
         for (Map<String, Object> item : items) {
-            if (item == null || item.get("track") == null) {
-                continue;
+            Track track = new Track();
+            track.setName((String) item.get("name"));
+            track.setExplicit((Boolean) item.get("explicit"));
+            track.setIsrc(extractISRC(item));
+            track.setPreviewUrl((String) item.get("preview_url"));
+
+            // Artists
+            List<Map<String, Object>> artistObjs = (List<Map<String, Object>>) item.get("artists");
+            List<String> artistNames = new ArrayList<>();
+            for (Map<String, Object> artist : artistObjs) {
+                artistNames.add((String) artist.get("name"));
             }
+            track.setArtists(artistNames);
 
-            Map<String, Object> track = (Map<String, Object>) item.get("track");
-            if (track == null) {
-                continue;
-            }
-
-            track.put("source", source);
-
-            if (source.equals("recently_played")) {
-                track.put("played_at", item.get("played_at"));
+            // Album cover
+            Map<String, Object> album = (Map<String, Object>) item.get("album");
+            if (album != null && album.containsKey("images")) {
+                List<Map<String, Object>> images = (List<Map<String, Object>>) album.get("images");
+                if (!images.isEmpty()) {
+                    track.setAlbumCover((String) images.get(0).get("url"));
+                }
             }
 
             tracks.add(track);
@@ -105,171 +86,257 @@ public class SpotifyService {
         return tracks;
     }
 
-    public List<Map<String, Object>> getNonPopularTracks(String accessToken, int maxPopularity, int limit) {
-        List<Map<String, Object>> allTracks = getTracksFromMultipleSources(accessToken);
+    private String extractISRC(Map<String, Object> item) {
+        try {
+            Map<String, Object> externalIds = (Map<String, Object>) item.get("external_ids");
+            return externalIds != null ? (String) externalIds.get("isrc") : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
-        // Filter non-popular tracks
-        List<Map<String, Object>> nonPopularTracks = allTracks.stream()
-                .filter(track -> track != null && track.get("popularity") != null && (int) track.get("popularity") < maxPopularity)
-                .collect(Collectors.toList());
+    public List<Track> applyFilters(List<Track> tracks, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
+        List<Track> filtered = new ArrayList<>();
 
-        // Remove duplicates using ISRC or track ID
-        Map<String, Map<String, Object>> uniqueTracks = new HashMap<>();
-        for (Map<String, Object> track : nonPopularTracks) {
-            if (track == null) {
+        int total = 0;
+        int skippedExplicit = 0;
+        int skippedLove = 0;
+        int skippedFolk = 0;
+
+        for (Track track : tracks) {
+            if (track == null) continue;
+            total++;
+
+            // 🔍 Fetch genres from Last.fm if missing
+            if ((track.getGenres() == null || track.getGenres().isEmpty()) && track.getArtists() != null && !track.getArtists().isEmpty()) {
+                List<String> genres = lastFmService.getGenresForTrack(track.getName(), track.getArtists().get(0));
+                if (!genres.isEmpty()) {
+                    track.setGenres(genres);
+                    System.out.println("🎼 Genres for " + track.getName() + ": " + genres);
+                }
+            }
+
+            boolean hasLove = track.getName() != null && track.getName().toLowerCase().contains("love");
+            boolean isFolk = track.getGenres() != null && track.getGenres().stream().anyMatch(g -> g.toLowerCase().contains("folk"));
+
+            if (excludeExplicit && track.isExplicit()) {
+                skippedExplicit++;
                 continue;
             }
 
-            Map<String, Object> externalIds = (Map<String, Object>) track.get("external_ids");
-            String isrc = externalIds != null ? (String) externalIds.getOrDefault("isrc", track.get("id").toString()) : track.get("id").toString();
-            uniqueTracks.put(isrc, track);
-        }
-
-        // Convert unique tracks back to a list
-        List<Map<String, Object>> selectedTracks = new ArrayList<>(uniqueTracks.values());
-
-        // Shuffle the tracks to ensure randomness
-        Collections.shuffle(selectedTracks);
-
-        // Filter tracks with preview URLs
-        List<Map<String, Object>> tracksWithPreviews = new ArrayList<>();
-        for (Map<String, Object> track : selectedTracks) {
-            String previewUrl = getPreviewUrl(track);
-            if (previewUrl != null) {
-                track.put("preview_url", previewUrl);
-                tracksWithPreviews.add(track);
+            if (excludeLoveSongs && hasLove) {
+                skippedLove++;
+                continue;
             }
 
-            // Stop once we have enough tracks with previews
-            if (tracksWithPreviews.size() >= limit) {
-                break;
+            if (excludeFolk && isFolk) {
+                skippedFolk++;
+                continue;
             }
+
+            // Enrich preview URL via Deezer fallback
+            if (track.getPreviewUrl() == null || track.getPreviewUrl().isBlank()) {
+                String fallback = deezerService.getPreviewUrlFallback(track.getName(), track.getArtists());
+                System.out.println("🎧 Fallback preview for " + track.getName() + ": " + fallback);
+                if (fallback != null) track.setPreviewUrl(fallback);
+            }
+
+            // Enrich album cover via Deezer fallback
+            if (track.getAlbumCover() == null || track.getAlbumCover().isBlank()) {
+                String cover = deezerService.getAlbumCoverFallback(track.getName(), track.getArtists());
+                if (cover != null) track.setAlbumCover(cover);
+            }
+
+            filtered.add(track);
         }
 
-        return tracksWithPreviews;
+        // Summary log
+        System.out.println("🎛️ Filter Summary:");
+        System.out.println("Total input: " + total);
+        if (excludeExplicit) System.out.println("⛔ Removed explicit: " + skippedExplicit);
+        if (excludeLoveSongs) System.out.println("💔 Removed love songs: " + skippedLove);
+        if (excludeFolk) System.out.println("🪕 Removed folk songs: " + skippedFolk);
+        System.out.println("✅ Tracks kept: " + filtered.size());
+
+        return filtered;
     }
+    
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> extractSearchTracks(Map<String, Object> response) {
+        List<Map<String, Object>> tracks = new ArrayList<>();
 
-    private String getPreviewUrl(Map<String, Object> track) {
-        // Try Spotify preview URL first
-        String previewUrl = (String) track.get("preview_url");
+        if (response == null || !response.containsKey("tracks")) return tracks;
 
-        // If Spotify preview URL is not available, try Deezer
-        if (previewUrl == null || previewUrl.isEmpty()) {
-            String trackName = (String) track.get("name");
-            List<Map<String, Object>> artists = (List<Map<String, Object>>) track.get("artists");
-            String artistName = artists.stream()
+        Map<String, Object> tracksWrapper = (Map<String, Object>) response.get("tracks");
+        if (tracksWrapper == null || !tracksWrapper.containsKey("items")) return tracks;
+
+        tracks.addAll((List<Map<String, Object>>) tracksWrapper.get("items"));
+        return tracks;
+    }
+    
+    public List<Track> searchTrack(String query, String accessToken,
+            boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + accessToken);
+		
+		HttpEntity<String> entity = new HttpEntity<>(headers);
+		String url = SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=50";
+		
+		ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+		List<Map<String, Object>> rawTracks = extractSearchTracks(response.getBody());
+		
+		// Convert raw tracks to Track objects (optional but ideal)
+		List<Track> tracks = rawTracks.stream()
+		.map(this::mapToTrack)
+		.toList();
+		
+		return applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
+	}
+
+    private Track mapToTrack(Map<String, Object> trackData) {
+        Track track = new Track();
+        track.setName((String) trackData.get("name"));
+        track.setIsrc((String) ((Map<String, Object>) trackData.getOrDefault("external_ids", Map.of())).getOrDefault("isrc", ""));
+
+        // Get preview URL
+        track.setPreviewUrl((String) trackData.get("preview_url"));
+
+        // Get album cover
+        Map<String, Object> album = (Map<String, Object>) trackData.get("album");
+        if (album != null && album.get("images") instanceof List<?> images && !images.isEmpty()) {
+            Map<String, Object> firstImage = (Map<String, Object>) images.get(0);
+            track.setAlbumCover((String) firstImage.get("url"));
+        }
+
+        // Get artist names
+        List<Map<String, Object>> artistList = (List<Map<String, Object>>) trackData.get("artists");
+        if (artistList != null) {
+            List<String> artistNames = artistList.stream()
                     .map(artist -> (String) artist.get("name"))
-                    .collect(Collectors.joining(", "));
-
-            previewUrl = getDeezerPreviewUrl(trackName, artistName);
+                    .toList();
+            track.setArtists(artistNames);
         }
 
-        return previewUrl;
+        // Set genres (optional; if your API includes them or from fallback)
+        track.setGenres((List<String>) trackData.getOrDefault("genres", List.of()));
+
+        return track;
     }
+    
+    public Optional<Track> getCurrentlyPlayingTrack(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
 
-    /**
-     * Fetch a Deezer preview URL for a given track name and artist.
-     */
-    private String getDeezerPreviewUrl(String trackName, String artistName) {
-        RestTemplate restTemplate = new RestTemplate();
-        String query = trackName + " " + artistName;
-        String url = DEEZER_API_URL + "/search?q=" + query;
-
+        String url = "https://api.spotify.com/v1/me/player/currently-playing";
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
-            Map<String, Object> responseBody = response.getBody();
-
-            if (responseBody != null && responseBody.containsKey("data")) {
-                List<Map<String, Object>> tracks = (List<Map<String, Object>>) responseBody.get("data");
-                if (!tracks.isEmpty()) {
-                    // Return the preview URL of the first matching track
-                    return (String) tracks.get(0).get("preview");
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> item = (Map<String, Object>) response.getBody().get("item");
+                if (item != null) {
+                    return Optional.of(mapToTrack(item));
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // fallback
+            System.out.println("⚠️ Error fetching currently playing, falling back to recently played.");
         }
 
-        return null; // No preview URL found
+        // Fallback: recently played
+        url = "https://api.spotify.com/v1/me/player/recently-played?limit=1";
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("items");
+        if (items != null && !items.isEmpty()) {
+            Map<String, Object> track = (Map<String, Object>) items.get(0).get("track");
+            return Optional.of(mapToTrack(track));
+        }
+
+        return Optional.empty();
     }
 
-    public List<Map<String, Object>> enrichTrackData(List<Map<String, Object>> tracks, String accessToken) {
-        RestTemplate restTemplate = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
+    public Track getRandomSpotifyTrack(String accessToken) {
+        List<Track> allTracks = getTracksFromMultipleSources(accessToken);
+        if (allTracks.isEmpty()) return null;
+        Collections.shuffle(allTracks);
+        return allTracks.get(0);
+    }
+    
+    public List<Track> getTracksFromMultipleSources(String accessToken) {
+        List<Track> allTracks = new ArrayList<>();
 
-        HttpEntity<String> entity = new HttpEntity<>(headers);
+        // Add top tracks
+        System.out.println("Calling get top tracks which has filter method inside");
+        allTracks.addAll(getTopTracks(accessToken, false, false, false));
 
-        // Fetch artist details
-        Set<String> artistIds = new HashSet<>();
-        for (Map<String, Object> track : tracks) {
-            List<Map<String, Object>> artists = (List<Map<String, Object>>) track.get("artists");
-            for (Map<String, Object> artist : artists) {
-                artistIds.add((String) artist.get("id"));
-            }
-        }
+        // Add recently played (optional fallback if not present)
+        getRecentlyPlayedTracks(accessToken).ifPresent(allTracks::addAll);
 
-        Map<String, Map<String, Object>> artistDetails = new HashMap<>();
-        List<String> artistIdList = new ArrayList<>(artistIds);
-        for (int i = 0; i < artistIdList.size(); i += 50) {
-            List<String> batch = artistIdList.subList(i, Math.min(i + 50, artistIdList.size()));
-            String artistUrl = "https://api.spotify.com/v1/artists?ids=" + String.join(",", batch);
-            ResponseEntity<Map> response = restTemplate.exchange(artistUrl, HttpMethod.GET, entity, Map.class);
-            List<Map<String, Object>> artists = (List<Map<String, Object>>) response.getBody().get("artists");
-            for (Map<String, Object> artist : artists) {
-                artistDetails.put((String) artist.get("id"), artist);
-            }
-        }
+        // Shuffle to ensure randomness
+        Collections.shuffle(allTracks);
 
-        // Enrich track data
-        List<Map<String, Object>> enrichedTracks = new ArrayList<>();
-        for (Map<String, Object> track : tracks) {
-            Map<String, Object> enrichedTrack = new HashMap<>();
-            enrichedTrack.put("name", track.get("name"));
+        return allTracks.stream().limit(20).collect(Collectors.toList());
+    }
+    
+//    public List<Track> mergeAndShuffleTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
+//        List<Track> mergedTracks = new ArrayList<>();
+//
+//        System.out.println("💡 Fetching top tracks...");
+//        List<Track> topTracks = getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk);
+//        System.out.println("🔢 Top tracks size: " + topTracks.size());
+//        mergedTracks.addAll(topTracks);
+//
+//        getRecentlyPlayedTracks(accessToken).ifPresent(recent -> {
+//            System.out.println("🕒 Recently played size: " + recent.size());
+//            mergedTracks.addAll(recent);
+//        });
+//
+//        Collections.shuffle(mergedTracks);
+//        System.out.println("🎲 Shuffled sample: " + mergedTracks.stream().map(Track::getName).limit(5).toList());
+//
+//        return mergedTracks.stream().limit(20).toList();
+//    }
 
-            // Extract artists
-            List<Map<String, Object>> artists = (List<Map<String, Object>>) track.get("artists");
-            enrichedTrack.put("artists", artists.stream()
-                    .map(artist -> (String) artist.get("name"))
-                    .collect(Collectors.toList()));
+    public List<Track> mergeAndShuffleTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
+        List<Track> mergedTracks = new ArrayList<>();
 
-            // Extract ISRC
-            Map<String, Object> externalIds = (Map<String, Object>) track.get("external_ids");
-            enrichedTrack.put("isrc", externalIds != null ? (String) externalIds.getOrDefault("isrc", "N/A") : "N/A");
+        // Add multiple sources
+        List<Track> topTracks = getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk); // already calls applyFilters
+        mergedTracks.addAll(topTracks);
+        
+        System.out.println("Applying filters in merge and shuffle tracks");
+        getRecentlyPlayedTracks(accessToken).ifPresent(rp -> mergedTracks.addAll(
+            applyFilters(rp, excludeExplicit, excludeLoveSongs, excludeFolk) // 💡 this wasn't filtered before
+        ));
 
-            // Extract genres
-            List<String> genres = new ArrayList<>();
-            for (Map<String, Object> artist : artists) {
-                Map<String, Object> artistDetail = artistDetails.get(artist.get("id"));
-                if (artistDetail != null) {
-                    List<String> artistGenres = (List<String>) artistDetail.get("genres");
-                    if (artistGenres != null) {
-                        genres.addAll(artistGenres);
-                    }
+        Collections.shuffle(mergedTracks);
+
+        List<Track> limited = mergedTracks.stream().limit(20).toList();
+        System.out.println("🎲 Final Shuffled Tracks: " + limited.stream().map(Track::getName).toList());
+        return limited;
+    }
+    
+    public Optional<List<Track>> getRecentlyPlayedTracks(String accessToken) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + accessToken);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            String url = "https://api.spotify.com/v1/me/player/recently-played?limit=20";
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("items");
+
+            List<Track> tracks = new ArrayList<>();
+            for (Map<String, Object> item : items) {
+                Map<String, Object> trackData = (Map<String, Object>) item.get("track");
+                if (trackData != null) {
+                    tracks.add(mapToTrack(trackData));
                 }
             }
-            enrichedTrack.put("genres", genres);
 
-            // Extract popularity
-            enrichedTrack.put("popularity", track.get("popularity"));
-
-            // Detect language
-            enrichedTrack.put("language", detectLanguage((String) track.get("name")));
-
-            // Extract album cover
-            Map<String, Object> album = (Map<String, Object>) track.get("album");
-            List<Map<String, Object>> images = (List<Map<String, Object>>) album.get("images");
-            enrichedTrack.put("album_cover", images != null && !images.isEmpty() ? (String) images.get(0).get("url") : "No image available");
-
-            // Add preview URL
-            enrichedTrack.put("preview_url", track.get("preview_url"));
-            enrichedTracks.add(enrichedTrack);
+            return Optional.of(tracks);
+        } catch (Exception e) {
+            System.out.println("⚠️ Failed to fetch recently played tracks: " + e.getMessage());
+            return Optional.empty();
         }
-
-        return enrichedTracks;
-    }
-
-    private String detectLanguage(String text) {
-        return text.matches(".*[a-zA-Z].*") ? "English" : "Unknown";
     }
 }

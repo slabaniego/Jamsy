@@ -1,113 +1,224 @@
 package ca.sheridancollege.jamsy.controllers;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import ca.sheridancollege.jamsy.beans.Track;
+import java.util.LinkedHashMap;
+import ca.sheridancollege.jamsy.models.SongAction;
+import ca.sheridancollege.jamsy.repositories.SongActionRepository;
+import ca.sheridancollege.jamsy.services.DeezerService;
+import ca.sheridancollege.jamsy.services.LastFmService;
+import ca.sheridancollege.jamsy.services.MusicBrainzService;
+import ca.sheridancollege.jamsy.services.SpotifyService;
+import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
 
-import org.springframework.http.ResponseEntity;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-//import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import com.google.gson.Gson;
 
-import ca.sheridancollege.jamsy.models.SongAction;
-import ca.sheridancollege.jamsy.repositories.SongActionRepository;
-import ca.sheridancollege.jamsy.services.LastFmService;
-import ca.sheridancollege.jamsy.services.SpotifyService;
-//import jakarta.servlet.http.HttpSession;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Controller
 public class WebController {
 
     private final SpotifyService spotifyService;
+    private final MusicBrainzService musicBrainzService;
+    private final OAuth2AuthorizedClientService authorizedClientService;
     private final SongActionRepository songActionRepo;
-
-    public WebController(SpotifyService spotifyService, SongActionRepository songActionRepo) {
-        this.spotifyService = spotifyService;
-        this.songActionRepo = songActionRepo;
-    }
-
+    private final LastFmService lastFmService;
+    private final DeezerService deezerService;
     
-    private final List<Map<String, String>> songActions = new ArrayList<>();
+    
+    public WebController(
+    		SpotifyService spotifyService, 
+    		OAuth2AuthorizedClientService authorizedClientService,
+    		SongActionRepository songActionRepo, 
+    		LastFmService lastFmService,
+    		DeezerService deezServ,
+    		MusicBrainzService musicBrainzService) {
+        this.spotifyService = spotifyService;
+        this.authorizedClientService = authorizedClientService;
+        this.songActionRepo = songActionRepo;
+        this.lastFmService = lastFmService;
+        this.deezerService = deezServ;
+        this.musicBrainzService = musicBrainzService;
+    }
     
     @GetMapping("/")
     public String home() {
-        return "login";
+        return "redirect:/login";
     }
 
-    // @GetMapping("/callback")
-    // public String callback(@RequestParam String code, HttpSession session) {
-    // String accessToken = spotifyService.getUserAccessToken(code);
-    // session.setAttribute("accessToken", accessToken);
-    // return "redirect:/tracks";
-    // }
+    @GetMapping("/login")
+    public String loginPage() {
+        return "login"; // make sure login.html exists in /templates
+    }
 
-    // @GetMapping("/tracks")
-    // public String tracks(HttpSession session, Model model) {
-    // String accessToken = (String) session.getAttribute("accessToken");
+    @GetMapping("/login/oauth2/code/spotify")
+    public String handleSpotifyRedirect(@RequestParam String code, HttpSession session) {
+        String accessToken = spotifyService.getUserAccessToken(code);
+        System.out.println("✅ Access token received: " + accessToken);
+        session.setAttribute("accessToken", accessToken);
+        return "redirect:/filters";
+    }
+    
+    @GetMapping("/test-session")
+    public String testSession(HttpSession session) {
+        System.out.println("Access token test = " + session.getAttribute("accessToken"));
+        return "filters";
+    }
 
-    // // Fetch non-popular tracks (popularity < 50) and limit to 20
-    // List<Map<String, Object>> nonPopularTracks =
-    // spotifyService.getNonPopularTracks(accessToken, 50, 20);
 
-    // // Enrich track data
-    // List<Map<String, Object>> enrichedTracks =
-    // spotifyService.enrichTrackData(nonPopularTracks, accessToken);
+    @GetMapping("/filters")
+    public String showFiltersPage(OAuth2AuthenticationToken authentication, HttpSession session) {
+        OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getName()
+        );
 
-    // // Log the tracks being added to the model
-    // System.out.println("Tracks to display: " + enrichedTracks);
-
-    // model.addAttribute("tracks", enrichedTracks);
-    // return "tracks";
-    // }
-
-    @GetMapping("/tracks")
-    public String tracks(@RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient,
-                         Model model) {
-        String accessToken = authorizedClient.getAccessToken().getTokenValue();
-
-        // Fetch non-popular tracks (popularity < 50) and limit to 20
-        List<Map<String, Object>> nonPopularTracks = spotifyService.getNonPopularTracks(accessToken, 50, 20);
-
-        // Enrich track data
-        List<Map<String, Object>> enrichedTracks = spotifyService.enrichTrackData(nonPopularTracks, accessToken);
-
-        // Add tracks to the model as JSON
-        model.addAttribute("tracks", enrichedTracks);
-        model.addAttribute("tracksJson", new Gson().toJson(enrichedTracks)); // Convert tracks to JSON
-
-        // Add the first track to the model
-        if (!enrichedTracks.isEmpty()) {
-            model.addAttribute("track", enrichedTracks.get(0));
+        if (client == null || client.getAccessToken() == null) {
+            System.out.println("⚠️ Couldn't get access token from authorized client");
+            return "redirect:/login";
         }
 
+        String accessToken = client.getAccessToken().getTokenValue();
+        session.setAttribute("accessToken", accessToken);
+
+        return "filters"; // return your filters page
+    }
+    
+    @GetMapping("/recommend")
+    public String mixedTracks(@RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient client,
+                              HttpSession session, Model model) {
+        String accessToken = client.getAccessToken().getTokenValue();
+
+        boolean excludeExplicit = Boolean.TRUE.equals(session.getAttribute("excludeExplicit"));
+        boolean excludeLove = Boolean.TRUE.equals(session.getAttribute("excludeLoveSongs"));
+        boolean excludeFolk = Boolean.TRUE.equals(session.getAttribute("excludeFolk"));
+
+        // Step 1: Get random Spotify track
+        Track randomTrack = spotifyService.getRandomSpotifyTrack(accessToken);
+        
+        if (randomTrack == null) return "error";
+
+        String trackName = randomTrack.getName();
+        String artistName = randomTrack.getArtists() != null && !randomTrack.getArtists().isEmpty()
+                            ? randomTrack.getArtists().get(0)
+                            : "";
+
+        // Step 2: Get Last.fm similar tracks
+        List<Track> lastFmSimilar = lastFmService.getSimilarTracksFromRandomSpotifyTrack(
+            trackName, artistName, excludeExplicit, excludeLove, excludeFolk, deezerService
+        );
+
+        // Step 3: Add to model
+        model.addAttribute("tracks", lastFmSimilar);
+        model.addAttribute("tracksJson", new Gson().toJson(lastFmSimilar));
+        System.out.println("From recommend --> mixedTracks");
+        return "tracks";
+    }
+
+    
+    @PostMapping("/recommend")
+    public String recommendTracks(
+            HttpSession session,
+            @RequestParam(defaultValue = "false") boolean excludeExplicit,
+            @RequestParam(defaultValue = "false") boolean excludeLoveSongs,
+            @RequestParam(defaultValue = "false") boolean excludeFolk,
+            Model model) {
+
+        String accessToken = (String) session.getAttribute("accessToken");
+        if (accessToken == null || accessToken.isBlank()) {
+            System.out.println("⚠️ No access token in session");
+            return "redirect:/login";
+        }
+
+        System.out.println("🔁 POST /recommend called with filters: " +
+            "explicit=" + excludeExplicit +
+            ", love=" + excludeLoveSongs +
+            ", folk=" + excludeFolk);
+
+        // ✅ Use fresh merged+shuffled list
+        List<Track> tracks = spotifyService.mergeAndShuffleTracks(
+            accessToken, excludeExplicit, excludeLoveSongs, excludeFolk);
+
+        model.addAttribute("tracks", tracks);
+        model.addAttribute("tracksJson", new Gson().toJson(tracks));
+
+        return "tracks";
+    }
+
+    
+    @GetMapping("/search")
+    public String searchTracks(
+            HttpSession session,
+            @RequestParam String query,
+            @RequestParam(defaultValue = "false") boolean excludeExplicit,
+            @RequestParam(defaultValue = "false") boolean excludeLoveSongs,
+            @RequestParam(defaultValue = "false") boolean excludeFolk,
+            Model model) {
+
+        String accessToken = (String) session.getAttribute("accessToken");
+        if (accessToken == null || accessToken.isBlank()) {
+            return "redirect:/login";
+        }
+
+        List<Track> tracks = spotifyService.searchTrack(query, accessToken, excludeExplicit, excludeLoveSongs, excludeFolk);
+        model.addAttribute("tracks", tracks);
+        return "tracks";
+    }
+    
+    @GetMapping("/tracks")
+    public String tracks(
+        @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient,
+        HttpSession session,
+        Model model
+    ) {
+        String accessToken = authorizedClient.getAccessToken().getTokenValue();
+
+        // Get filters (stored earlier from form)
+        boolean excludeExplicit = Boolean.TRUE.equals(session.getAttribute("excludeExplicit"));
+        boolean excludeLoveSongs = Boolean.TRUE.equals(session.getAttribute("excludeLoveSongs"));
+        boolean excludeFolk = Boolean.TRUE.equals(session.getAttribute("excludeFolk"));
+
+        // ✅ This call ensures fresh results on every visit
+        System.out.println("✅ Calling mergeAndShuffleTracks()");
+        List<Track> mergedTracks = spotifyService.mergeAndShuffleTracks(
+            accessToken, excludeExplicit, excludeLoveSongs, excludeFolk
+        );
+
+        model.addAttribute("tracks", mergedTracks);
+        model.addAttribute("tracksJson", new Gson().toJson(mergedTracks));
+        System.out.println("From tracks --> tracks");
         return "tracks";
     }
     
     @PostMapping("/handle-action")
     @ResponseBody
     public Map<String, Object> handleAction(
-            @RequestBody Map<String, Object> requestBody // Use @RequestBody to parse JSON
-    ) {
-    	String isrc = (String) requestBody.get("isrc");
+            @RequestBody Map<String, Object> requestBody,
+            HttpSession session) {
+        String isrc = (String) requestBody.get("isrc");
         String songName = (String) requestBody.get("songName");
         String artist = (String) requestBody.get("artist");
         String action = (String) requestBody.get("action");
-    
-     // Genres comes as a List from JSON
         List<String> genres = (List<String>) requestBody.get("genres");
-
-        // Log the action for debugging
-        System.out.println("Action received: " + action + " for song " + songName + " (ISRC: " + isrc + ")");
 
         // Save to DB
         SongAction songAction = new SongAction();
@@ -117,48 +228,80 @@ public class WebController {
         songAction.setGenres(genres);
         songAction.setAction(action);
         songActionRepo.save(songAction);
+
+        // Check if this was the last track
+        Integer currentIndex = (Integer) session.getAttribute("currentTrackIndex");
+        Integer totalTracks = (Integer) session.getAttribute("totalTracks");
         
-        // Return success response
-        return Map.of("success", true);
+        boolean isLastTrack = false;
+        if (currentIndex != null && totalTracks != null) {
+            isLastTrack = (currentIndex + 1) >= totalTracks;
+        }
+
+        return Map.of(
+            "success", true,
+            "isLastTrack", isLastTrack
+        );
+    }
+    
+    @GetMapping("/recommendations")
+    public String showRecommendationsPage(Model model) {
+        List<SongAction> likedSongs = songActionRepo.findByAction("like");
+        
+        if (likedSongs.isEmpty()) {
+            model.addAttribute("error", "No liked songs found to base recommendations on");
+            return "recommendations";
+        }
+        
+        Map<SongAction, List<Track>> allRecommendations = new LinkedHashMap<>();
+        int maxPopularity = 40; // Only show tracks with popularity < 40
+        
+        for (SongAction likedSong : likedSongs) {
+            try {
+                // Get recommendations from both services
+                List<Track> lastFmRecs = lastFmService.getSimilarTracksWithPopularity(
+                    likedSong.getSongName(), 
+                    likedSong.getArtist(),
+                    maxPopularity
+                );
+                
+                List<Track> musicBrainzRecs = musicBrainzService.getObscureSimilarTracks(
+                    likedSong.getSongName(),
+                    likedSong.getArtist(),
+                    maxPopularity
+                );
+                
+                // Combine and deduplicate
+                List<Track> combined = Stream.concat(lastFmRecs.stream(), musicBrainzRecs.stream())
+                    .distinct()
+                    .sorted(Comparator.comparingInt(Track::getPopularity))
+                    .limit(10)
+                    .collect(Collectors.toList());
+                
+                // Ensure album covers are set
+                combined.forEach(track -> {
+                    if (track.getAlbumCover() == null || track.getAlbumCover().isEmpty()) {
+                        String cover = deezerService.getAlbumCoverFallback(
+                            track.getName(), 
+                            track.getArtists()
+                        );
+                        track.setAlbumCover(cover);
+                    }
+                });
+                
+                if (!combined.isEmpty()) {
+                    allRecommendations.put(likedSong, combined);
+                }
+                
+            } catch (Exception e) {
+                System.err.println("Error processing song: " + likedSong.getSongName());
+                e.printStackTrace();
+            }
+        }
+        
+        model.addAttribute("allRecommendations", allRecommendations);
+        return "recommendations";
     }
 
-    @GetMapping("/song-actions")
-    public String songActions(Model model) {
-    	 List<SongAction> allActions = songActionRepo.findAll();
 
-         List<SongAction> likedSongs = allActions.stream()
-                 .filter(action -> "like".equalsIgnoreCase(action.getAction()))
-                 .collect(Collectors.toList());
-
-         List<SongAction> unlikedSongs = allActions.stream()
-                 .filter(action -> "unlike".equalsIgnoreCase(action.getAction()))
-                 .collect(Collectors.toList());
-
-         model.addAttribute("likedSongs", likedSongs);
-         model.addAttribute("unlikedSongs", unlikedSongs);
-
-         return "song-actions"; // Thymeleaf template
-    }
-
-    // @GetMapping("/test")
-    // public String test() {
-    // return "This is a test!";
-    // }
-
-    @GetMapping("/test-lastfm")
-    public ResponseEntity<Map<String, Object>> testLastFm() {
-        LastFmService lastFmService = new LastFmService();
-
-        // Test getting genres for a known track
-        List<String> genres = lastFmService.getGenresForTrack("Bohemian Rhapsody", "Queen");
-
-        // Test getting similar genres for "rock"
-        List<String> similarGenres = lastFmService.getSimilarGenres("rock");
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("trackGenres", genres);
-        response.put("similarGenres", similarGenres);
-
-        return ResponseEntity.ok(response);
-    }
 }

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${songName} + ' - Track Details'"></title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --danger-color: #f44336;
+            --dark-color: #333;
+            --light-color: #f4f4f9;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--light-color);
+            color: var(--dark-color);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+        
+        .track-title {
+            font-size: 2.2rem;
+            margin-bottom: 5px;
+            color: var(--dark-color);
+        }
+        
+        .artist-name {
+            font-size: 1.5rem;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .isrc-badge {
+            display: inline-block;
+            background: var(--dark-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .info-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: 20px;
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+        }
+        
+        .card-title i {
+            margin-right: 10px;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            min-width: 120px;
+            color: #555;
+        }
+        
+        .info-value {
+            flex: 1;
+        }
+        
+        .tag {
+            display: inline-block;
+            background: var(--primary-color);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .mood-tag {
+            background: var(--secondary-color);
+        }
+        
+        .attribute-tag {
+            background: #9C27B0;
+        }
+        
+        .explicit-badge {
+            background: var(--danger-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+        
+        .similar-track {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .similar-track:last-child {
+            border-bottom: none;
+        }
+        
+        .similar-track-name {
+            font-weight: 500;
+        }
+        
+        .similar-track-artist {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .match-score {
+            float: right;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .album-card {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .album-name {
+            font-weight: 500;
+            margin-top: 10px;
+        }
+        
+        .album-date {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .lyrics-container {
+            white-space: pre-line;
+            line-height: 1.8;
+        }
+        
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--dark-color);
+            color: white;
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        
+        .back-button:hover {
+            background: #222;
+            transform: translateY(-2px);
+        }
+        
+        .error-message {
+            color: var(--danger-color);
+            padding: 15px;
+            background: #ffebee;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .track-title {
+                font-size: 1.8rem;
+            }
+            
+            .artist-name {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Error message (if any) -->
+        <div th:if="${trackInfo.error}" class="error-message">
+            <i class="fas fa-exclamation-circle"></i>
+            <span th:text="${trackInfo.error}"></span>
+        </div>
+        
+        <!-- Header with track title and artist -->
+        <div class="header">
+            <h1 class="track-title" th:text="${songName}">
+                <span th:if="${trackInfo.explicit}" class="explicit-badge">EXPLICIT</span>
+            </h1>
+            <h2 class="artist-name" th:text="${artistName}"></h2>
+            <div class="isrc-badge" th:text="'ISRC: ' + ${isrc}"></div>
+        </div>
+        
+        <!-- Main grid with all track information -->
+        <div class="grid-container">
+            <!-- Basic Info Card -->
+            <div class="info-card">
+                <h3 class="card-title"><i class="fas fa-info-circle"></i> Basic Information</h3>
+                <div class="info-row">
+                    <span class="info-label">Title:</span>
+                    <span class="info-value" th:text="${trackInfo.title} ?: 'Unknown'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Artists:</span>
+                    <span class="info-value" th:if="${trackInfo.artists}" 
+                          th:text="${#strings.listJoin(trackInfo.artists, ', ')}">Unknown</span>
+                    <span class="info-value" th:unless="${trackInfo.artists}">Unknown</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Duration:</span>
+                    <span class="info-value" th:if="${trackInfo.length}" 
+                          th:text="${#numbers.formatInteger(trackInfo.length / 60000, 1)} + ':' + ${#numbers.formatInteger((trackInfo.length % 60000) / 1000, 2)}">Unknown</span>
+                    <span class="info-value" th:unless="${trackInfo.length}">Unknown</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Explicit:</span>
+                    <span class="info-value" th:text="${trackInfo.explicit} ? 'Yes' : 'No'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Listeners:</span>
+                    <span class="info-value" th:text="${trackInfo.listeners} ?: 'Unknown'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Play Count:</span>
+                    <span class="info-value" th:text="${trackInfo.playcount} ?: 'Unknown'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Rating:</span>
+                    <span class="info-value" th:if="${trackInfo.rating}" 
+                          th:text="${trackInfo.rating} + '/5 (' + ${trackInfo.ratingCount} + ' votes)'">Not rated</span>
+                    <span class="info-value" th:unless="${trackInfo.rating}">Not rated</span>
+                </div>
+            </div>
+            
+            <!-- Genres & Tags Card -->
+            <div class="info-card">
+                <h3 class="card-title"><i class="fas fa-tags"></i> Genres & Tags</h3>
+                <div th:if="${trackInfo.genres} || ${trackInfo.tags}">
+                    <div th:if="${trackInfo.genres}">
+                        <h4>Genres:</h4>
+                        <div>
+                            <span th:each="genre : ${trackInfo.genres}" class="tag" th:text="${genre}"></span>
+                        </div>
+                    </div>
+                    <div th:if="${trackInfo.tags}">
+                        <h4>Community Tags:</h4>
+                        <div>
+                            <span th:each="tag : ${trackInfo.tags}" class="tag" th:text="${tag}"></span>
+                        </div>
+                    </div>
+                </div>
+                <div th:unless="${trackInfo.genres} || ${trackInfo.tags}">
+                    <p>No genre or tag information available.</p>
+                </div>
+            </div>
+            
+            <!-- Mood & Attributes Card -->
+            <div class="info-card">
+                <h3 class="card-title"><i class="fas fa-smile"></i> Mood & Attributes</h3>
+                <div th:if="${trackInfo.attributes}">
+                    <div th:if="${trackInfo.attributes.moods}">
+                        <h4>Moods:</h4>
+                        <div>
+                            <span th:each="mood : ${trackInfo.attributes.moods}" class="tag mood-tag" th:text="${mood}"></span>
+                        </div>
+                    </div>
+                    <div th:if="${trackInfo.attributes.attributes}">
+                        <h4>Attributes:</h4>
+                        <div>
+                            <span th:each="attr : ${trackInfo.attributes.attributes}" class="tag attribute-tag" th:text="${attr}"></span>
+                        </div>
+                    </div>
+                </div>
+                <div th:unless="${trackInfo.attributes}">
+                    <p>No mood or attribute information available.</p>
+                </div>
+            </div>
+            
+            <!-- Albums Card -->
+            <div class="info-card">
+                <h3 class="card-title"><i class="fas fa-compact-disc"></i> Albums</h3>
+                <div th:if="${trackInfo.albums}">
+                    <div th:each="album : ${trackInfo.albums}" class="album-card">
+                        <div class="album-name" th:text="${album.title}"></div>
+                        <div class="album-date" th:text="${album.date} ?: 'Release date unknown'"></div>
+                        <div class="album-country" th:if="${album.country}" th:text="${album.country}"></div>
+                    </div>
+                </div>
+                <div th:unless="${trackInfo.albums}">
+                    <p>No album information available.</p>
+                </div>
+            </div>
+            
+            <!-- Similar Tracks Card -->
+            <div class="info-card">
+                <h3 class="card-title"><i class="fas fa-random"></i> Similar Tracks</h3>
+                <div th:if="${trackInfo.similarTracks}">
+                    <div th:each="track : ${trackInfo.similarTracks}" class="similar-track">
+                        <div class="similar-track-name" th:text="${track.name}"></div>
+                        <div class="similar-track-artist" th:text="${track.artist}"></div>
+                        <div class="match-score" th:text="${#numbers.formatDecimal(track.match * 100, 1, 0)} + '%'"></div>
+                    </div>
+                </div>
+                <div th:unless="${trackInfo.similarTracks}">
+                    <p>No similar tracks information available.</p>
+                </div>
+            </div>
+            
+            <!-- Lyrics Card -->
+            <div class="info-card" th:if="${trackInfo.lyrics}">
+                <h3 class="card-title"><i class="fas fa-music"></i> Lyrics</h3>
+                <div class="lyrics-container" th:text="${trackInfo.lyrics}"></div>
+            </div>
+        </div>
+        
+        
+        
+        <!-- Back button -->
+        <a href="/tracks" class="back-button"><i class="fas fa-arrow-left"></i> Back to Recommendations</a>
+    </div>
+</body>
+</html>
