@@ -2,95 +2,309 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Recommended Songs</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Poppins', sans-serif;
-            background-color: #f4f4f9;
+            background-color: #f8f9fa;
             padding: 30px;
         }
 
-        h1, h2 {
+		.no-snippet {
+    font-size: 12px;
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    width: 100%;
+    padding: 8px;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+.try-deezer {
+    margin-top: 5px;
+}
+
+.try-deezer a {
+    color: #1DB954;
+    text-decoration: none;
+}
+
+.try-deezer a:hover {
+    text-decoration: underline;
+}
+
+.preview-button i {
+    margin-right: 5px;
+}
+        h1 {
             text-align: center;
             color: #333;
+            margin-bottom: 30px;
+        }
+
+        .recommendation-section {
+            max-width: 1000px;
+            margin: 30px auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
         }
 
         .base-track {
-            text-align: center;
-            margin-bottom: 30px;
             font-size: 18px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            color: #444;
         }
 
-        .recommendation-list {
-            max-width: 700px;
-            margin: auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        .tracks-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+            gap: 15px;
         }
 
         .track-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
+            padding: 15px;
+            border-radius: 8px;
+            background: #fafafa;
+            transition: all 0.2s;
+        }
+
+        .track-item:hover {
+            background: #f5f5f5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
         }
 
         .track-info {
-            display: flex;
-            flex-direction: column;
+            flex-grow: 1;
+            min-width: 0;
+            padding-right: 15px;
         }
 
         .track-name {
             font-weight: 500;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 15px;
         }
 
         .artist-name {
-            font-size: 14px;
-            color: #777;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
         }
 
-        .listen-link {
-            font-size: 14px;
-            color: #2196F3;
+        .genre-list {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .genre-tag {
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .track-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            min-width: 220px;
+        }
+
+        .preview-button {
+            background: #1DB954;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
             text-decoration: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+            text-align: center;
+            width: 100%;
         }
 
-        .listen-link:hover {
-            text-decoration: underline;
+        .preview-button:hover {
+            background: #1ed760;
+            transform: scale(1.02);
+        }
+
+        .album-cover {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            margin-right: 15px;
+            object-fit: cover;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
         }
 
         .error-message {
             text-align: center;
             color: #f44336;
             font-weight: bold;
+            padding: 20px;
+        }
+
+        .track-main {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            flex-grow: 1;
+        }
+
+        .section-title {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .snippet-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        .snippet-label {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        audio {
+            width: 200px;
+            height: 35px;
+            border-radius: 20px;
+        }
+
+        audio::-webkit-media-controls-panel {
+            background-color: #f5f5f5;
+            border-radius: 20px;
+        }
+
+        .no-snippet {
+            font-size: 12px;
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .tracks-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .track-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .track-actions {
+                width: 100%;
+                margin-top: 10px;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
 <body>
 
-    <h1>Recommended Songs</h1>
-
-    <div class="base-track" th:if="${baseTrack != null}">
-        Because you liked <strong th:text="${baseTrack.songName}"></strong>
-        by <strong th:text="${baseTrack.artist}"></strong>...
-    </div>
+    <h1>Your Personalized Recommendations</h1>
 
     <div th:if="${error}" class="error-message" th:text="${error}"></div>
 
-    <div class="recommendation-list" th:if="${recommendations}">
-        <div class="track-item" th:each="rec : ${recommendations}">
-            <div class="track-info">
-                <div class="track-name" th:text="${rec.name}">Track Name</div>
-                <div class="artist-name" th:text="${rec.artist.name}">Artist</div>
-            </div>
-            <a class="listen-link"
-               th:href="${rec.url}"
-               target="_blank">Listen</a>
+    <div th:unless="${allRecommendations.isEmpty()}">
+        <div class="section-title">Based on your liked songs, we found these recommendations:</div>
+        
+        <div th:each="entry : ${allRecommendations}">
+            <div class="recommendation-section">
+                <div class="base-track">
+                    Because you liked <strong th:text="${entry.key.songName}"></strong>
+                    by <strong th:text="${entry.key.artist}"></strong>
+                </div>
+                
+                <div class="tracks-container">
+                    <div class="track-item" th:each="track : ${entry.value}">
+                        <div class="track-main">
+                            <img th:src="${track.albumCover ?: '/images/default-cover.jpg'}" 
+                                 class="album-cover" 
+                                 alt="Album cover"
+                                 onerror="this.src='/images/default-cover.jpg'">
+                            <div class="track-info">
+                                <div class="track-name" th:text="${track.name}">Track Name</div>
+                                <div class="artist-name" th:text="${#strings.listJoin(track.artists, ', ')}">Artist</div>
+                                <div class="genre-list" th:if="${track.genres}">
+                                    <span th:each="genre : ${track.genres}" class="genre-tag" th:text="${genre}"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="track-actions">
+    <div class="snippet-container" th:if="${track.previewUrl}">
+        <div class="snippet-label">30s PREVIEW</div>
+        <audio controls>
+            <source th:src="${track.previewUrl}" type="audio/mpeg">
+            Your browser does not support audio previews.
+        </audio>
+    </div>
+    <div class="no-snippet" th:unless="${track.previewUrl}">
+        <i class="fas fa-music"></i> Full song only
+        <div class="try-deezer" th:if="${track.externalUrl}">
+            <small>Try searching on <a th:href="'https://www.deezer.com/search/' + ${#strings.listJoin(track.artists, ' ')} + ' ' + ${track.name}" 
+               target="_blank">Deezer</a></small>
         </div>
     </div>
+    <a th:if="${track.externalUrl}" 
+       th:href="${track.externalUrl}" 
+       target="_blank" 
+       class="preview-button">
+        <i class="fab fa-spotify"></i> Open in Spotify
+    </a>
+</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-play the first snippet when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const firstAudio = document.querySelector('audio');
+            if (firstAudio) {
+                firstAudio.play().catch(e => console.log('Auto-play prevented:', e));
+            }
+            
+            // Pause other snippets when one plays
+            document.querySelectorAll('audio').forEach(audio => {
+                audio.addEventListener('play', function() {
+                    document.querySelectorAll('audio').forEach(otherAudio => {
+                        if (otherAudio !== audio) otherAudio.pause();
+                    });
+                });
+            });
+        });
+    </script>
 
 </body>
 </html>

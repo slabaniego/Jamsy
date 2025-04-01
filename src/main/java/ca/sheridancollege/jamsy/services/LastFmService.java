@@ -168,34 +168,62 @@ public class LastFmService {
                 .collect(Collectors.toList());
     }
     
-    public List<Track> getSimilarTracksFromRandomSpotifyTrack(String name, String artist, boolean excludeExplicit, boolean excludeLove, boolean excludeFolk, DeezerService deezerService) {
+    public List<Track> getSimilarTracksFromRandomSpotifyTrack(String name, String artist, 
+    	    boolean excludeExplicit, boolean excludeLove, boolean excludeFolk, 
+    	    DeezerService deezerService) {
+    	    
+    	    List<Map<String, Object>> similar = getSimilarTracks(name, artist);
+    	    Collections.shuffle(similar);
+
+    	    return similar.stream()
+    	        .map(data -> {
+    	            Track track = mapLastFmTrack(data, "similar");
+    	            
+    	            // First try Spotify preview, then Deezer fallback
+    	            if (track.getPreviewUrl() == null) {
+    	                String deezerPreview = deezerService.getPreviewUrlFallback(
+    	                    track.getName(), 
+    	                    track.getArtists()
+    	                );
+    	                track.setPreviewUrl(deezerPreview);
+    	            }
+
+    	            // Ensure album cover exists
+    	            if (track.getAlbumCover() == null) {
+    	                String cover = deezerService.getAlbumCoverFallback(
+    	                    track.getName(), 
+    	                    track.getArtists()
+    	                );
+    	                track.setAlbumCover(cover);
+    	            }
+
+    	            return track;
+    	        })
+    	        .filter(Objects::nonNull)
+    	        .limit(20)
+    	        .collect(Collectors.toList());
+    	}
+    
+    public List<Track> getSimilarTracksWithPopularity(String name, String artist, int maxPopularity) {
         List<Map<String, Object>> similar = getSimilarTracks(name, artist);
-        Collections.shuffle(similar); // add randomness
+        Collections.shuffle(similar);
 
         return similar.stream()
             .map(data -> {
-                Track track = mapLastFmTrack(data, "similar"); // make sure mapLastFmTrack is public
-                if ((excludeExplicit && track.isExplicit()) ||
-                    (excludeLove && track.getName().toLowerCase().contains("love")) ||
-                    (excludeFolk && track.getGenres().toString().toLowerCase().contains("folk"))) {
-                    return null;
-                }
-
-                // Use Deezer fallback for preview/cover
-                if (track.getPreviewUrl() == null) {
-                    String url = deezerService.getPreviewUrlFallback(track.getName(), track.getArtists());
-                    track.setPreviewUrl(url);
-                }
-
-                if (track.getAlbumCover() == null) {
-                    String cover = deezerService.getAlbumCoverFallback(track.getName(), track.getArtists());
-                    track.setAlbumCover(cover);
+                Track track = mapLastFmTrack(data, "similar");
+                
+                // Calculate popularity based on listeners count
+                if (data.containsKey("listeners")) {
+                    int listeners = Integer.parseInt(data.get("listeners").toString());
+                    int popularity = Math.min(100, listeners / 1000); // Scale listeners to 0-100
+                    track.setPopularity(popularity);
+                } else {
+                    track.setPopularity(30); // Default for obscure tracks
                 }
 
                 return track;
             })
-            .filter(Objects::nonNull)
-            .limit(20)
+            .filter(t -> t.getPopularity() < maxPopularity)
             .collect(Collectors.toList());
     }
 

@@ -10,6 +10,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Track {
+	private String externalUrl;
+	private int popularity;
     private String name;
     private String isrc;
     private boolean explicit;

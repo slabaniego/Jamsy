@@ -99,12 +99,14 @@
                 genres: track.genres,
                 action: action
             })
-        }).then(() => {
+        }).then(response => response.json())
+          .then(data => {
             currentIndex++;
             if (currentIndex < tracks.length) {
                 displayTrack(currentIndex);
             } else {
-                document.getElementById("trackContainer").innerHTML = "<h2>You're all done! 🎉</h2>";
+                // All tracks processed, redirect to recommendations
+                window.location.href = '/recommendations';
             }
         });
     }
