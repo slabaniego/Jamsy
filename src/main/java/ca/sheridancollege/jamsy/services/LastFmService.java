@@ -5,6 +5,7 @@ import org.springframework.web.client.RestTemplate;
 
 import ca.sheridancollege.jamsy.beans.Track;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
@@ -16,7 +17,9 @@ import java.util.stream.Collectors;
 @Service
 public class LastFmService {
 
-    private static final String API_KEY = "cde0694956a54c781c66c9547e282d1e";
+    @Value("${lastfm.api.key}")
+    private String apiKey;
+    
     private static final String BASE_URL = "http://ws.audioscrobbler.com/2.0/";
 
     private final RestTemplate restTemplate = new RestTemplate();
@@ -25,7 +28,7 @@ public class LastFmService {
      * Get genres (tags) for a specific track and artist.
      */
     public List<String> getGenresForTrack(String trackName, String artistName) {
-        String url = BASE_URL + "?method=track.getInfo&api_key=" + API_KEY
+        String url = BASE_URL + "?method=track.getInfo&api_key=" + apiKey
                 + "&track=" + trackName + "&artist=" + artistName + "&format=json";
 
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
@@ -50,7 +53,7 @@ public class LastFmService {
      * Get genres related to a genre.
      */
     public List<String> getSimilarGenres(String genre) {
-        String url = BASE_URL + "?method=tag.getSimilar&api_key=" + API_KEY + "&tag=" + genre + "&format=json";
+        String url = BASE_URL + "?method=tag.getSimilar&api_key=" + apiKey + "&tag=" + genre + "&format=json";
 
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
         if (response.getBody() == null || response.getBody().get("tags") == null) return List.of();
@@ -74,7 +77,7 @@ public class LastFmService {
      
     public List<Map<String, Object>> getSimilarTracks(String trackName, String artistName) {
         String url = BASE_URL + "?method=track.getSimilar&track=" + trackName + "&artist=" + artistName
-                + "&api_key=" + API_KEY + "&format=json";
+                + "&api_key=" + apiKey + "&format=json";
 
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
         if (response.getBody() == null || response.getBody().get("similartracks") == null) return List.of();
@@ -121,7 +124,7 @@ public class LastFmService {
     public List<Track> getRecommendedTracksFromLastFm(String tag) {
         String url = "http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag="
                      + URLEncoder.encode(tag, StandardCharsets.UTF_8)
-                     + "&api_key=" + API_KEY + "&format=json";
+                     + "&api_key=" + apiKey + "&format=json";
 
         ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
         Map<String, Object> responseBody = response.getBody();
@@ -150,7 +153,7 @@ public class LastFmService {
 
         String url = BASE_URL + "?method=tag.gettoptracks&tag="
                      + URLEncoder.encode(tag, StandardCharsets.UTF_8)
-                     + "&api_key=" + API_KEY + "&format=json";
+                     + "&api_key=" + apiKey + "&format=json";
 
         ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
         Map<String, Object> body = response.getBody();
