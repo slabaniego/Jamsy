@@ -65,8 +65,24 @@
                   <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-   <dependency>
+        </dependency>
+        <dependency>
+   			 <groupId>com.google.firebase</groupId>
+   			 <artifactId>firebase-admin</artifactId>
+    		<version>9.2.0</version>
+        </dependency>
+		
+        <!-- ENV-->
+        <dependency>
+   			 <groupId>org.springframework.boot</groupId>
+    		 <artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+		    <groupId>me.paulschwarz</groupId>
+		    <artifactId>spring-dotenv</artifactId>
+		    <version>3.0.0</version>
+		</dependency>
+        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-client</artifactId>
         </dependency>
