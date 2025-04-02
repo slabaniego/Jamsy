@@ -3,10 +3,11 @@
 <head>
     <title>Track Recommendations</title>
     <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f4f4;
+            font-family: 'Poppins', sans-serif;
+            background: #f4f4f9;
             text-align: center;
             padding: 40px;
         }
@@ -31,19 +32,62 @@
             padding: 10px 25px;
             border: none;
             border-radius: 6px;
-            background-color: #007bff;
-            color: white;
             cursor: pointer;
             font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        button.like {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        button.unlike {
+            background-color: #f44336;
+            color: white;
         }
 
         button:hover {
-            background-color: #0056b3;
+            opacity: 0.9;
+            transform: translateY(-2px);
         }
 
         audio {
             margin-top: 15px;
             width: 100%;
+        }
+
+        .song-counter {
+            font-size: 16px;
+            color: #555;
+            margin: 10px 0;
+        }
+
+        .submit-btn {
+            padding: 12px 30px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .submit-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .submit-btn:not(:disabled):hover {
+            background-color: #0b7dda;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
     </style>
 </head>
@@ -60,9 +104,15 @@
         <audio id="previewPlayer" controls autoplay></audio>
 
         <div>
-            <button onclick="handleAction('like')">👍 Like</button>
-            <button onclick="handleAction('unlike')">👎 Unlike</button>
+            <button class="like" onclick="handleAction('like')">👍 Like</button>
+            <button class="unlike" onclick="handleAction('unlike')">👎 Unlike</button>
         </div>
+        
+        <div class="song-counter">
+            Song <span id="currentSongNumber">1</span> of <span id="totalSongs">0</span>
+        </div>
+        
+        <button id="submitBtn" class="submit-btn" onclick="submitActions()" disabled>Submit Choices</button>
     </div>
 </div>
 
@@ -75,6 +125,7 @@
     }
 
     let currentIndex = 0;
+    let actionsTaken = 0;
 
     function displayTrack(index) {
         const track = tracks[index];
@@ -85,10 +136,13 @@
         document.getElementById("albumCover").src = track.albumCover || "";
         document.getElementById("genreText").innerText = track.genres?.join(", ") || "Genres: N/A";
         document.getElementById("previewPlayer").src = track.previewUrl || "";
+        document.getElementById("currentSongNumber").textContent = index + 1;
     }
 
     function handleAction(action) {
         const track = tracks[currentIndex];
+        if (!track) return;
+
         fetch('/handle-action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -101,19 +155,33 @@
             })
         }).then(response => response.json())
           .then(data => {
+            actionsTaken++;
+            
+            // Enable submit button after 5 actions
+            if (actionsTaken >= 5) {
+                document.getElementById('submitBtn').disabled = false;
+            }
+            
             currentIndex++;
             if (currentIndex < tracks.length) {
                 displayTrack(currentIndex);
             } else {
-                // All tracks processed, redirect to recommendations
-                window.location.href = '/recommendations';
+                // All tracks processed
+                document.getElementById('submitBtn').disabled = false;
             }
-        });
+        }).catch(error => console.error("Error:", error));
     }
 
-    window.onload = () => displayTrack(currentIndex);
-</script>
+    function submitActions() {
+        // Redirect to recommendations page
+        window.location.href = '/recommendations';
+    }
 
+    window.onload = () => {
+        document.getElementById('totalSongs').textContent = tracks.length;
+        displayTrack(currentIndex);
+    };
+</script>
 
 </body>
 </html>

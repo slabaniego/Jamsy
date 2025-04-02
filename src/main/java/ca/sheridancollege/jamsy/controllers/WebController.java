@@ -209,6 +209,8 @@ public class WebController {
         return "tracks";
     }
     
+
+    
     @PostMapping("/handle-action")
     @ResponseBody
     public Map<String, Object> handleAction(
@@ -229,21 +231,9 @@ public class WebController {
         songAction.setAction(action);
         songActionRepo.save(songAction);
 
-        // Check if this was the last track
-        Integer currentIndex = (Integer) session.getAttribute("currentTrackIndex");
-        Integer totalTracks = (Integer) session.getAttribute("totalTracks");
-        
-        boolean isLastTrack = false;
-        if (currentIndex != null && totalTracks != null) {
-            isLastTrack = (currentIndex + 1) >= totalTracks;
-        }
-
-        return Map.of(
-            "success", true,
-            "isLastTrack", isLastTrack
-        );
+        return Map.of("success", true);
     }
-    
+
     @GetMapping("/recommendations")
     public String showRecommendationsPage(Model model) {
         List<SongAction> likedSongs = songActionRepo.findByAction("like");
