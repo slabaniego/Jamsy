@@ -9,10 +9,6 @@ import ca.sheridancollege.jamsy.services.LastFmService;
 import ca.sheridancollege.jamsy.services.MusicBrainzService;
 import ca.sheridancollege.jamsy.services.SpotifyService;
 import jakarta.servlet.http.HttpSession;
-import lombok.RequiredArgsConstructor;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -23,14 +19,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import com.google.gson.Gson;
-
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -209,6 +200,8 @@ public class WebController {
         return "tracks";
     }
     
+
+    
     @PostMapping("/handle-action")
     @ResponseBody
     public Map<String, Object> handleAction(
@@ -229,21 +222,9 @@ public class WebController {
         songAction.setAction(action);
         songActionRepo.save(songAction);
 
-        // Check if this was the last track
-        Integer currentIndex = (Integer) session.getAttribute("currentTrackIndex");
-        Integer totalTracks = (Integer) session.getAttribute("totalTracks");
-        
-        boolean isLastTrack = false;
-        if (currentIndex != null && totalTracks != null) {
-            isLastTrack = (currentIndex + 1) >= totalTracks;
-        }
-
-        return Map.of(
-            "success", true,
-            "isLastTrack", isLastTrack
-        );
+        return Map.of("success", true);
     }
-    
+
     @GetMapping("/recommendations")
     public String showRecommendationsPage(Model model) {
         List<SongAction> likedSongs = songActionRepo.findByAction("like");

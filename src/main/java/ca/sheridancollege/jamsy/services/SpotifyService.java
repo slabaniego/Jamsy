@@ -1,6 +1,7 @@
 package ca.sheridancollege.jamsy.services;
 
 import ca.sheridancollege.jamsy.beans.Track;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -11,8 +12,12 @@ import java.util.stream.Collectors;
 @Service
 public class SpotifyService {
 
-    private static final String CLIENT_ID = "a889ff03eaa84050b3d323debcf1498f";
-    private static final String CLIENT_SECRET = "1b8849fc75db4306bf791e3617e7a195";
+    @Value("${spotify.client.id}")
+    private String clientId;
+
+    @Value("${spotify.client.secret}")
+    private String clientSecret;
+
     private static final String SPOTIFY_API_URL = "https://api.spotify.com/v1";
 
     private final RestTemplate restTemplate = new RestTemplate();
@@ -24,21 +29,67 @@ public class SpotifyService {
         this.lastFmService = last;
     }
 
-    public String getUserAccessToken(String code) {
+    public String getSpotifyUserId(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<String> entity = new HttpEntity<>("parameters", headers);
+        ResponseEntity<Map> response = restTemplate.exchange(
+                "https://api.spotify.com/v1/me",
+                HttpMethod.GET,
+                entity,
+                Map.class);
+
+        return (String) response.getBody().get("id");
+    }
+
+    public String getUserAccessToken(String code, String redirectUri) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         String body = "grant_type=authorization_code&code=" + code +
-                "&redirect_uri=http://localhost:8080/login/oauth2/code/spotify" +
-                "&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET;
+                "&redirect_uri=" + redirectUri +
+                "&client_id=" + clientId + "&client_secret=" + clientSecret;
 
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = restTemplate.exchange("https://accounts.spotify.com/api/token", HttpMethod.POST, entity, Map.class);
+        ResponseEntity<Map> response = restTemplate.exchange(
+                "https://accounts.spotify.com/api/token",
+                HttpMethod.POST, entity, Map.class);
 
         return (String) response.getBody().get("access_token");
     }
 
-    public List<Track> getTopTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
+        public String getUserAccessToken(String code) {
+        return getUserAccessToken(code, "http://localhost:8080/login/oauth2/code/spotify");
+    }
+
+    public Map<String, String> refreshAccessToken(String refreshToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth(clientId, clientSecret);
+
+        String body = "grant_type=refresh_token&refresh_token=" + refreshToken;
+
+        HttpEntity<String> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<Map> response = restTemplate.exchange(
+                "https://accounts.spotify.com/api/token",
+                HttpMethod.POST, entity, Map.class);
+
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("access_token", (String) response.getBody().get("access_token"));
+        if (response.getBody().containsKey("refresh_token")) {
+            tokens.put("refresh_token", (String) response.getBody().get("refresh_token"));
+        } else {
+            tokens.put("refresh_token", refreshToken); // Return the same refresh token if not provided
+        }
+        tokens.put("token_type", (String) response.getBody().get("token_type"));
+        tokens.put("expires_in", String.valueOf(response.getBody().get("expires_in")));
+
+        return tokens;
+    }
+
+    public List<Track> getTopTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs,
+            boolean excludeFolk) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
         HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -53,7 +104,8 @@ public class SpotifyService {
 
     private List<Track> extractTrackItems(Map<String, Object> response) {
         List<Track> tracks = new ArrayList<>();
-        if (response == null || !response.containsKey("items")) return tracks;
+        if (response == null || !response.containsKey("items"))
+            return tracks;
 
         List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");
         for (Map<String, Object> item : items) {
@@ -95,7 +147,8 @@ public class SpotifyService {
         }
     }
 
-    public List<Track> applyFilters(List<Track> tracks, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
+    public List<Track> applyFilters(List<Track> tracks, boolean excludeExplicit, boolean excludeLoveSongs,
+            boolean excludeFolk) {
         List<Track> filtered = new ArrayList<>();
 
         int total = 0;
@@ -104,11 +157,13 @@ public class SpotifyService {
         int skippedFolk = 0;
 
         for (Track track : tracks) {
-            if (track == null) continue;
+            if (track == null)
+                continue;
             total++;
 
             // 🔍 Fetch genres from Last.fm if missing
-            if ((track.getGenres() == null || track.getGenres().isEmpty()) && track.getArtists() != null && !track.getArtists().isEmpty()) {
+            if ((track.getGenres() == null || track.getGenres().isEmpty()) && track.getArtists() != null
+                    && !track.getArtists().isEmpty()) {
                 List<String> genres = lastFmService.getGenresForTrack(track.getName(), track.getArtists().get(0));
                 if (!genres.isEmpty()) {
                     track.setGenres(genres);
@@ -117,7 +172,8 @@ public class SpotifyService {
             }
 
             boolean hasLove = track.getName() != null && track.getName().toLowerCase().contains("love");
-            boolean isFolk = track.getGenres() != null && track.getGenres().stream().anyMatch(g -> g.toLowerCase().contains("folk"));
+            boolean isFolk = track.getGenres() != null
+                    && track.getGenres().stream().anyMatch(g -> g.toLowerCase().contains("folk"));
 
             if (excludeExplicit && track.isExplicit()) {
                 skippedExplicit++;
@@ -138,13 +194,15 @@ public class SpotifyService {
             if (track.getPreviewUrl() == null || track.getPreviewUrl().isBlank()) {
                 String fallback = deezerService.getPreviewUrlFallback(track.getName(), track.getArtists());
                 System.out.println("🎧 Fallback preview for " + track.getName() + ": " + fallback);
-                if (fallback != null) track.setPreviewUrl(fallback);
+                if (fallback != null)
+                    track.setPreviewUrl(fallback);
             }
 
             // Enrich album cover via Deezer fallback
             if (track.getAlbumCover() == null || track.getAlbumCover().isBlank()) {
                 String cover = deezerService.getAlbumCoverFallback(track.getName(), track.getArtists());
-                if (cover != null) track.setAlbumCover(cover);
+                if (cover != null)
+                    track.setAlbumCover(cover);
             }
 
             filtered.add(track);
@@ -153,50 +211,56 @@ public class SpotifyService {
         // Summary log
         System.out.println("🎛️ Filter Summary:");
         System.out.println("Total input: " + total);
-        if (excludeExplicit) System.out.println("⛔ Removed explicit: " + skippedExplicit);
-        if (excludeLoveSongs) System.out.println("💔 Removed love songs: " + skippedLove);
-        if (excludeFolk) System.out.println("🪕 Removed folk songs: " + skippedFolk);
+        if (excludeExplicit)
+            System.out.println("⛔ Removed explicit: " + skippedExplicit);
+        if (excludeLoveSongs)
+            System.out.println("💔 Removed love songs: " + skippedLove);
+        if (excludeFolk)
+            System.out.println("🪕 Removed folk songs: " + skippedFolk);
         System.out.println("✅ Tracks kept: " + filtered.size());
 
         return filtered;
     }
-    
+
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> extractSearchTracks(Map<String, Object> response) {
         List<Map<String, Object>> tracks = new ArrayList<>();
 
-        if (response == null || !response.containsKey("tracks")) return tracks;
+        if (response == null || !response.containsKey("tracks"))
+            return tracks;
 
         Map<String, Object> tracksWrapper = (Map<String, Object>) response.get("tracks");
-        if (tracksWrapper == null || !tracksWrapper.containsKey("items")) return tracks;
+        if (tracksWrapper == null || !tracksWrapper.containsKey("items"))
+            return tracks;
 
         tracks.addAll((List<Map<String, Object>>) tracksWrapper.get("items"));
         return tracks;
     }
-    
+
     public List<Track> searchTrack(String query, String accessToken,
             boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
-		HttpHeaders headers = new HttpHeaders();
-		headers.set("Authorization", "Bearer " + accessToken);
-		
-		HttpEntity<String> entity = new HttpEntity<>(headers);
-		String url = SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=50";
-		
-		ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-		List<Map<String, Object>> rawTracks = extractSearchTracks(response.getBody());
-		
-		// Convert raw tracks to Track objects (optional but ideal)
-		List<Track> tracks = rawTracks.stream()
-		.map(this::mapToTrack)
-		.toList();
-		
-		return applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
-	}
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        String url = SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=50";
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        List<Map<String, Object>> rawTracks = extractSearchTracks(response.getBody());
+
+        // Convert raw tracks to Track objects (optional but ideal)
+        List<Track> tracks = rawTracks.stream()
+                .map(this::mapToTrack)
+                .toList();
+
+        return applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
+    }
 
     private Track mapToTrack(Map<String, Object> trackData) {
         Track track = new Track();
         track.setName((String) trackData.get("name"));
-        track.setIsrc((String) ((Map<String, Object>) trackData.getOrDefault("external_ids", Map.of())).getOrDefault("isrc", ""));
+        track.setIsrc((String) ((Map<String, Object>) trackData.getOrDefault("external_ids", Map.of()))
+                .getOrDefault("isrc", ""));
 
         // Get preview URL
         track.setPreviewUrl((String) trackData.get("preview_url"));
@@ -222,7 +286,7 @@ public class SpotifyService {
 
         return track;
     }
-    
+
     public Optional<Track> getCurrentlyPlayingTrack(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
@@ -256,11 +320,12 @@ public class SpotifyService {
 
     public Track getRandomSpotifyTrack(String accessToken) {
         List<Track> allTracks = getTracksFromMultipleSources(accessToken);
-        if (allTracks.isEmpty()) return null;
+        if (allTracks.isEmpty())
+            return null;
         Collections.shuffle(allTracks);
         return allTracks.get(0);
     }
-    
+
     public List<Track> getTracksFromMultipleSources(String accessToken) {
         List<Track> allTracks = new ArrayList<>();
 
@@ -276,45 +341,26 @@ public class SpotifyService {
 
         return allTracks.stream().limit(20).collect(Collectors.toList());
     }
-    
-//    public List<Track> mergeAndShuffleTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
-//        List<Track> mergedTracks = new ArrayList<>();
-//
-//        System.out.println("💡 Fetching top tracks...");
-//        List<Track> topTracks = getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk);
-//        System.out.println("🔢 Top tracks size: " + topTracks.size());
-//        mergedTracks.addAll(topTracks);
-//
-//        getRecentlyPlayedTracks(accessToken).ifPresent(recent -> {
-//            System.out.println("🕒 Recently played size: " + recent.size());
-//            mergedTracks.addAll(recent);
-//        });
-//
-//        Collections.shuffle(mergedTracks);
-//        System.out.println("🎲 Shuffled sample: " + mergedTracks.stream().map(Track::getName).limit(5).toList());
-//
-//        return mergedTracks.stream().limit(20).toList();
-//    }
 
-    public List<Track> mergeAndShuffleTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
-        List<Track> mergedTracks = new ArrayList<>();
+    public List<Track> mergeAndShuffleTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs,
+            boolean excludeFolk) {
+        List<Track> tracks = new ArrayList<>();
 
-        // Add multiple sources
-        List<Track> topTracks = getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk); // already calls applyFilters
-        mergedTracks.addAll(topTracks);
-        
-        System.out.println("Applying filters in merge and shuffle tracks");
-        getRecentlyPlayedTracks(accessToken).ifPresent(rp -> mergedTracks.addAll(
-            applyFilters(rp, excludeExplicit, excludeLoveSongs, excludeFolk) // 💡 this wasn't filtered before
-        ));
+        // Get tracks from Spotify top tracks
+        tracks.addAll(getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk));
 
-        Collections.shuffle(mergedTracks);
+        // Get tracks from LastFM recommendations
+        tracks.addAll(lastFmService.getFreshLastFmRecommendations());
 
-        List<Track> limited = mergedTracks.stream().limit(20).toList();
-        System.out.println("🎲 Final Shuffled Tracks: " + limited.stream().map(Track::getName).toList());
-        return limited;
+        // Apply filters to the entire collection
+        tracks = applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
+
+// Shuffle the tracks
+        Collections.shuffle(tracks);
+
+                return tracks;
     }
-    
+
     public Optional<List<Track>> getRecentlyPlayedTracks(String accessToken) {
         try {
             HttpHeaders headers = new HttpHeaders();
