@@ -59,9 +59,33 @@ public class SpotifyService {
         return (String) response.getBody().get("access_token");
     }
 
-    // new line
-    public String getUserAccessToken(String code) {
+        public String getUserAccessToken(String code) {
         return getUserAccessToken(code, "http://localhost:8080/login/oauth2/code/spotify");
+    }
+
+    public Map<String, String> refreshAccessToken(String refreshToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth(clientId, clientSecret);
+
+        String body = "grant_type=refresh_token&refresh_token=" + refreshToken;
+
+        HttpEntity<String> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<Map> response = restTemplate.exchange(
+                "https://accounts.spotify.com/api/token",
+                HttpMethod.POST, entity, Map.class);
+
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("access_token", (String) response.getBody().get("access_token"));
+        if (response.getBody().containsKey("refresh_token")) {
+            tokens.put("refresh_token", (String) response.getBody().get("refresh_token"));
+        } else {
+            tokens.put("refresh_token", refreshToken); // Return the same refresh token if not provided
+        }
+        tokens.put("token_type", (String) response.getBody().get("token_type"));
+        tokens.put("expires_in", String.valueOf(response.getBody().get("expires_in")));
+
+        return tokens;
     }
 
     public List<Track> getTopTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs,
@@ -318,48 +342,23 @@ public class SpotifyService {
         return allTracks.stream().limit(20).collect(Collectors.toList());
     }
 
-    // public List<Track> mergeAndShuffleTracks(String accessToken, boolean
-    // excludeExplicit, boolean excludeLoveSongs, boolean excludeFolk) {
-    // List<Track> mergedTracks = new ArrayList<>();
-    //
-    // System.out.println("💡 Fetching top tracks...");
-    // List<Track> topTracks = getTopTracks(accessToken, excludeExplicit,
-    // excludeLoveSongs, excludeFolk);
-    // System.out.println("🔢 Top tracks size: " + topTracks.size());
-    // mergedTracks.addAll(topTracks);
-    //
-    // getRecentlyPlayedTracks(accessToken).ifPresent(recent -> {
-    // System.out.println("🕒 Recently played size: " + recent.size());
-    // mergedTracks.addAll(recent);
-    // });
-    //
-    // Collections.shuffle(mergedTracks);
-    // System.out.println("🎲 Shuffled sample: " +
-    // mergedTracks.stream().map(Track::getName).limit(5).toList());
-    //
-    // return mergedTracks.stream().limit(20).toList();
-    // }
-
     public List<Track> mergeAndShuffleTracks(String accessToken, boolean excludeExplicit, boolean excludeLoveSongs,
             boolean excludeFolk) {
-        List<Track> mergedTracks = new ArrayList<>();
+        List<Track> tracks = new ArrayList<>();
 
-        // Add multiple sources
-        List<Track> topTracks = getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk); // already
-                                                                                                           // calls
-                                                                                                           // applyFilters
-        mergedTracks.addAll(topTracks);
+        // Get tracks from Spotify top tracks
+        tracks.addAll(getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk));
 
-        System.out.println("Applying filters in merge and shuffle tracks");
-        getRecentlyPlayedTracks(accessToken).ifPresent(rp -> mergedTracks.addAll(
-                applyFilters(rp, excludeExplicit, excludeLoveSongs, excludeFolk) // 💡 this wasn't filtered before
-        ));
+        // Get tracks from LastFM recommendations
+        tracks.addAll(lastFmService.getFreshLastFmRecommendations());
 
-        Collections.shuffle(mergedTracks);
+        // Apply filters to the entire collection
+        tracks = applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
 
-        List<Track> limited = mergedTracks.stream().limit(20).toList();
-        System.out.println("🎲 Final Shuffled Tracks: " + limited.stream().map(Track::getName).toList());
-        return limited;
+// Shuffle the tracks
+        Collections.shuffle(tracks);
+
+                return tracks;
     }
 
     public Optional<List<Track>> getRecentlyPlayedTracks(String accessToken) {
