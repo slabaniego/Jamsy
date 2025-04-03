@@ -26,7 +26,7 @@ public class SecurityConfig {
 	    http
 	        .csrf(csrf -> csrf.disable())
 	        .authorizeHttpRequests(auth -> auth
-	            .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**", "/filters", "/spotify/exchange", "/api/tracks").permitAll()
+	            .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**", "/filters", "/spotify/exchange", "/api/tracks", "/api/auth/**").permitAll()
 	            .anyRequest().authenticated()
 	        )
 	        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
