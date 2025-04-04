@@ -18,6 +18,9 @@ public class SpotifyService {
     @Value("${spotify.client.secret}")
     private String clientSecret;
 
+    @Value("${spotify.mobile.redirect-uri}")
+    private String mobileRedirectUri;
+
     private static final String SPOTIFY_API_URL = "https://api.spotify.com/v1";
 
     private final RestTemplate restTemplate = new RestTemplate();
@@ -59,8 +62,8 @@ public class SpotifyService {
         return (String) response.getBody().get("access_token");
     }
 
-        public String getUserAccessToken(String code) {
-        return getUserAccessToken(code, "http://localhost:8080/login/oauth2/code/spotify");
+    public String getUserAccessToken(String code) {
+        return getUserAccessToken(code, mobileRedirectUri);
     }
 
     public Map<String, String> refreshAccessToken(String refreshToken) {
