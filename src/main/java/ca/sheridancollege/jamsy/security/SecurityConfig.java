@@ -1,6 +1,7 @@
 package ca.sheridancollege.jamsy.security;
 
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -13,23 +14,29 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+	
+	@Value("${SPOTIFY_CLIENT_ID}")
+    private String clientId;
+    
+    @Value("${SPOTIFY_CLIENT_SECRET}")
+    private String clientSecret;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())  // Disable CSRF for H2 + POSTs
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**", "/filters").permitAll()
-                .anyRequest().authenticated()
-            )
-            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
-            .oauth2Login(oauth2 -> oauth2
-                .loginPage("/login") // Your custom login screen
-                .defaultSuccessUrl("/filters", true) // ✅ Redirect to filters.html after Spotify login
-            );
+	@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	    http
+	        .csrf(csrf -> csrf.disable())
+	        .authorizeHttpRequests(auth -> auth
+	            .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**", "/filters", "/spotify/exchange", "/api/tracks", "/api/auth/**").permitAll()
+	            .anyRequest().authenticated()
+	        )
+	        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+	        .oauth2Login(oauth2 -> oauth2
+	            .loginPage("/login")
+	            .defaultSuccessUrl("/filters", true)
+	        );
 
-        return http.build();
-    }
+	    return http.build();
+	}
 
     @Bean
     public ClientRegistrationRepository clientRegistrationRepository() {
@@ -38,8 +45,8 @@ public class SecurityConfig {
 
     private ClientRegistration spotifyClientRegistration() {
         return ClientRegistration.withRegistrationId("spotify")
-            .clientId("a889ff03eaa84050b3d323debcf1498f")
-            .clientSecret("1b8849fc75db4306bf791e3617e7a195")
+            .clientId(clientId)
+            .clientSecret(clientSecret)
             .scope("user-top-read", "user-library-read", "user-read-recently-played")
             .authorizationUri("https://accounts.spotify.com/authorize")
             .tokenUri("https://accounts.spotify.com/api/token")

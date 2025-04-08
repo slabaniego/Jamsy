@@ -32,3 +32,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+# Environment variables
+.env
+
+# Firebase credentials
+src/main/resources/firebase-service-account.json
