@@ -118,11 +118,15 @@
 
 <script th:inline="javascript">
     // Assign the JSON string and parse it
-    let tracks = [[${tracksJson}]];
+    /* let tracks = [[${tracksJson}]];
     if (typeof tracks === 'string') {
         console.warn("🚨 tracks is a string, parsing JSON...");
         tracks = JSON.parse(tracks);
-    }
+    } */
+    
+    let tracks = /*[[${tracksJson}]]*/ '[]';
+    tracks = JSON.parse(tracks);
+    console.log("🎶 Tracks loaded:", tracks);
 
     let currentIndex = 0;
     let actionsTaken = 0;

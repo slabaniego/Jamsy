@@ -1,5 +1,6 @@
 package ca.sheridancollege.jamsy.controllers;
 
+import ca.sheridancollege.jamsy.beans.PlaylistTemplate;
 import ca.sheridancollege.jamsy.beans.Track;
 import java.util.LinkedHashMap;
 import ca.sheridancollege.jamsy.models.SongAction;
@@ -7,6 +8,7 @@ import ca.sheridancollege.jamsy.repositories.SongActionRepository;
 import ca.sheridancollege.jamsy.services.DeezerService;
 import ca.sheridancollege.jamsy.services.LastFmService;
 import ca.sheridancollege.jamsy.services.MusicBrainzService;
+import ca.sheridancollege.jamsy.services.PlaylistTemplateService;
 import ca.sheridancollege.jamsy.services.SpotifyService;
 import jakarta.servlet.http.HttpSession;
 
@@ -34,6 +36,7 @@ public class WebController {
     private final SongActionRepository songActionRepo;
     private final LastFmService lastFmService;
     private final DeezerService deezerService;
+    private final PlaylistTemplateService templateService;
     
     
     public WebController(
@@ -42,13 +45,15 @@ public class WebController {
     		SongActionRepository songActionRepo, 
     		LastFmService lastFmService,
     		DeezerService deezServ,
-    		MusicBrainzService musicBrainzService) {
+    		MusicBrainzService musicBrainzService,
+    		PlaylistTemplateService templateService) {
         this.spotifyService = spotifyService;
         this.authorizedClientService = authorizedClientService;
         this.songActionRepo = songActionRepo;
         this.lastFmService = lastFmService;
         this.deezerService = deezServ;
         this.musicBrainzService = musicBrainzService;
+        this.templateService = templateService;
     }
     
     @GetMapping("/")
@@ -283,6 +288,64 @@ public class WebController {
         model.addAttribute("allRecommendations", allRecommendations);
         return "recommendations";
     }
+    
+    // Playlist templates
 
+    @GetMapping("/playlist-templates")
+    public String showPlaylistTemplates(HttpSession session, Model model) {
+        String accessToken = (String) session.getAttribute("accessToken");
+        if (accessToken == null || accessToken.isBlank()) {
+            return "redirect:/login";
+        }
 
+        List<PlaylistTemplate> templates = templateService.getDefaultTemplates();
+        model.addAttribute("templates", templates);
+
+        return "playlistTemplates"; // new Thymeleaf page
+    }
+    
+    @GetMapping("/playlist-templates/{name}")
+    public String recommendByTemplate(@PathVariable String name,
+                                      HttpSession session,
+                                      Model model) {
+
+        PlaylistTemplate template = templateService.getDefaultTemplates()
+                .stream()
+                .filter(t -> t.getName().equalsIgnoreCase(name))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Template not found"));
+
+        // ✅ Use Last.fm instead of Spotify
+        List<Track> tracks = lastFmService.getRecommendedTracksFromLastFm(
+                template.getSeedGenres().get(0) // pick first genre for now
+        );
+
+        model.addAttribute("tracks", tracks);
+        // model.addAttribute("selectedTemplate", template);
+        model.addAttribute("tracksJson", new Gson().toJson(tracks));
+
+        return "tracks";
+    }
+
+    
+    // Last.fm similar tracks (UI)
+    @GetMapping("/lastfm/similar")
+    public String showLastFmSimilar(
+            @RequestParam String track,
+            @RequestParam String artist,
+            @RequestParam(defaultValue = "20") int limit,
+            Model model
+    ) {
+        // Fetch similar tracks from Last.fm
+        List<Track> similarTracks = lastFmService.getSimilarTracksAsTracks(track, artist, limit);
+
+        // Add to model for Thymeleaf
+        model.addAttribute("tracks", similarTracks);
+        model.addAttribute("queryTrack", track);
+        model.addAttribute("queryArtist", artist);
+
+        System.out.println("🎶 Showing Last.fm similar tracks for " + track + " by " + artist);
+
+        return "tracks"; // reuse your existing tracks.html page
+    }
 }
