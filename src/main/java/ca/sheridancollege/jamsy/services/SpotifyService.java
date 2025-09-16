@@ -422,4 +422,42 @@ public class SpotifyService {
         Collections.shuffle(tracks);
         return tracks.stream().limit(20).collect(Collectors.toList());
     }
+    
+    //saving playlist
+    public String createPlaylist(String accessToken, String playlistName) {
+        String url = "https://api.spotify.com/v1/me/playlists";
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", playlistName);
+        body.put("description", "Generated from recommendations");
+        body.put("public", false);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        RestTemplate restTemplate = new RestTemplate();
+        Map<String, Object> response = restTemplate.postForObject(url, request, Map.class);
+
+        return (String) response.get("id"); // return playlist ID
+    }
+
+    public void addTracksToPlaylist(String accessToken, String playlistId, List<String> trackUris) {
+        String url = "https://api.spotify.com/v1/playlists/" + playlistId + "/tracks";
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("uris", trackUris);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.postForObject(url, request, Map.class);
+    }
+
 }

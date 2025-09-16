@@ -70,7 +70,7 @@ public class WebController {
     public String handleSpotifyRedirect(@RequestParam String code, HttpSession session) {
         String accessToken = spotifyService.getUserAccessToken(code);
         System.out.println("✅ Access token received: " + accessToken);
-        session.setAttribute("accessToken", accessToken);
+        session.setAttribute("spotifyAccessToken", accessToken);
         return "redirect:/filters";
     }
     
@@ -94,10 +94,14 @@ public class WebController {
         }
 
         String accessToken = client.getAccessToken().getTokenValue();
-        session.setAttribute("accessToken", accessToken);
+        session.setAttribute("spotifyAccessToken", accessToken);
 
-        return "filters"; // return your filters page
+        // ✅ Print scopes
+        System.out.println("✅ Spotify token scopes = " + client.getAccessToken().getScopes());
+
+        return "filters";
     }
+
     
     @GetMapping("/recommend")
     public String mixedTracks(@RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient client,
@@ -139,7 +143,7 @@ public class WebController {
             @RequestParam(defaultValue = "false") boolean excludeFolk,
             Model model) {
 
-        String accessToken = (String) session.getAttribute("accessToken");
+    	String accessToken = (String) session.getAttribute("spotifyAccessToken");
         if (accessToken == null || accessToken.isBlank()) {
             System.out.println("⚠️ No access token in session");
             return "redirect:/login";
@@ -170,7 +174,8 @@ public class WebController {
             @RequestParam(defaultValue = "false") boolean excludeFolk,
             Model model) {
 
-        String accessToken = (String) session.getAttribute("accessToken");
+    	String accessToken = (String) session.getAttribute("spotifyAccessToken");
+
         if (accessToken == null || accessToken.isBlank()) {
             return "redirect:/login";
         }
@@ -187,6 +192,8 @@ public class WebController {
         Model model
     ) {
         String accessToken = authorizedClient.getAccessToken().getTokenValue();
+        session.setAttribute("spotifyAccessToken", accessToken);
+
 
         // Get filters (stored earlier from form)
         boolean excludeExplicit = Boolean.TRUE.equals(session.getAttribute("excludeExplicit"));
@@ -232,6 +239,7 @@ public class WebController {
 
     @GetMapping("/recommendations")
     public String showRecommendationsPage(Model model) {
+    	
         List<SongAction> likedSongs = songActionRepo.findByAction("like");
         
         if (likedSongs.isEmpty()) {
@@ -293,7 +301,7 @@ public class WebController {
 
     @GetMapping("/playlist-templates")
     public String showPlaylistTemplates(HttpSession session, Model model) {
-        String accessToken = (String) session.getAttribute("accessToken");
+    	String accessToken = (String) session.getAttribute("spotifyAccessToken");
         if (accessToken == null || accessToken.isBlank()) {
             return "redirect:/login";
         }
@@ -348,4 +356,33 @@ public class WebController {
 
         return "tracks"; // reuse your existing tracks.html page
     }
+    
+    @PostMapping("/savePlaylist")
+    @ResponseBody
+    public String savePlaylist(
+            @RequestParam String playlistName,
+            @RequestParam List<String> trackUris,
+            HttpSession session) {
+
+        // accept either session key for compatibility
+        String accessToken = (String) session.getAttribute("spotifyAccessToken");
+        if (accessToken == null || accessToken.isBlank()) {
+            accessToken = (String) session.getAttribute("accessToken");
+        }
+
+        if (accessToken == null || accessToken.isBlank()) {
+            return "❌ No Spotify access token found. Please log in again.";
+        }
+
+        try {
+            String playlistId = spotifyService.createPlaylist(accessToken, playlistName);
+            spotifyService.addTracksToPlaylist(accessToken, playlistId, trackUris);
+            return "✅ Playlist saved successfully!";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "❌ Failed to save playlist: " + e.getMessage();
+        }
+    }
+
+
 }
