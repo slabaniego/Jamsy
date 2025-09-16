@@ -24,6 +24,11 @@ public class LastFmService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private final DeezerService deezerService;
+    
+    public LastFmService(DeezerService deezerService) {
+        this.deezerService = deezerService;
+    }
     /**
      * Get genres (tags) for a specific track and artist.
      */
@@ -76,8 +81,11 @@ public class LastFmService {
     // Get similar tracks based on one track and artist (for recommendations)
      
     public List<Map<String, Object>> getSimilarTracks(String trackName, String artistName) {
-        String url = BASE_URL + "?method=track.getSimilar&track=" + trackName + "&artist=" + artistName
-                + "&api_key=" + apiKey + "&format=json";
+    	// changed for better handle name handling with spaces
+        String url = BASE_URL + "?method=track.getSimilar" 
+        		+ "&track=" + URLEncoder.encode(trackName, StandardCharsets.UTF_8)
+        		+ "&artist=" + URLEncoder.encode(artistName, StandardCharsets.UTF_8)
+        		+ "&api_key=" + apiKey + "&format=json";
 
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
         if (response.getBody() == null || response.getBody().get("similartracks") == null) return List.of();
@@ -94,6 +102,18 @@ public class LastFmService {
 
         return similarTracks;
     }
+    
+    // Added wrapper to be called from controller
+    public List<Track> getSimilarTracksAsTracks(String trackName, String artistName, int limit) {
+        List<Map<String, Object>> similar = getSimilarTracks(trackName, artistName);
+
+        return similar.stream()
+                .map(data -> mapLastFmTrack(data, "similar"))
+                .filter(Objects::nonNull)
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
     
     private Track mapLastFmTrack(Map<String, Object> data, String tag) {
         Track track = new Track();
@@ -122,7 +142,7 @@ public class LastFmService {
     }
     
     public List<Track> getRecommendedTracksFromLastFm(String tag) {
-        String url = "http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag="
+        String url = BASE_URL + "?method=tag.gettoptracks&tag="
                      + URLEncoder.encode(tag, StandardCharsets.UTF_8)
                      + "&api_key=" + apiKey + "&format=json";
 
@@ -130,21 +150,42 @@ public class LastFmService {
         Map<String, Object> responseBody = response.getBody();
 
         if (responseBody == null || !responseBody.containsKey("tracks")) {
+            System.out.println("⚠️ No tracks found in response for tag: " + tag);
             return new ArrayList<>();
         }
 
         Map<String, Object> tracksWrapper = (Map<String, Object>) responseBody.get("tracks");
         List<Map<String, Object>> trackData = (List<Map<String, Object>>) tracksWrapper.get("track");
 
-        List<Track> tracks = new ArrayList<>();
-        for (Map<String, Object> data : trackData) {
-            tracks.add(mapLastFmTrack(data, tag));
+        if (trackData == null || trackData.isEmpty()) {
+            System.out.println("⚠️ Track list was empty for tag: " + tag);
+            return new ArrayList<>();
         }
 
-        return trackData.stream()
-        	    .map(data -> mapLastFmTrack(data, tag))
-        	    .collect(Collectors.toList());
+        // map results into your Track bean
+        List<Track> tracks = trackData.stream()
+                .map(data -> {
+                	Track track = mapLastFmTrack(data, tag);
+               
+                
+                // fallback preview from Deezer
+                if (track.getPreviewUrl() == null) {
+                	String preview = deezerService.getPreviewUrlFallback(track.getName(), track.getArtists());
+                	track.setPreviewUrl(preview);
+                }
+                
+                return track;
+    	})
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
+                
+        System.out.println("🎯 Last.fm request: " + url);
+        System.out.println("✅ Parsed " + tracks.size() + " tracks for tag: " + tag);
+        tracks.forEach(t -> System.out.println("🎵 " + t.getName() + " - " + t.getArtists()));
+
+        return tracks;
     }
+
 
 
     public List<Track> getFreshLastFmRecommendations() {

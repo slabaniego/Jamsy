@@ -1,5 +1,6 @@
 package ca.sheridancollege.jamsy.services;
 
+import ca.sheridancollege.jamsy.beans.PlaylistTemplate;
 import ca.sheridancollege.jamsy.beans.Track;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -353,7 +354,7 @@ public class SpotifyService {
         tracks.addAll(getTopTracks(accessToken, excludeExplicit, excludeLoveSongs, excludeFolk));
 
         // Get tracks from LastFM recommendations
-        tracks.addAll(lastFmService.getFreshLastFmRecommendations());
+        //tracks.addAll(lastFmService.getFreshLastFmRecommendations());
 
         // Apply filters to the entire collection
         tracks = applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
@@ -361,7 +362,7 @@ public class SpotifyService {
 // Shuffle the tracks
         Collections.shuffle(tracks);
 
-                return tracks;
+                return tracks.stream().limit(20).collect(Collectors.toList());
     }
 
     public Optional<List<Track>> getRecentlyPlayedTracks(String accessToken) {
@@ -387,5 +388,38 @@ public class SpotifyService {
             System.out.println("⚠️ Failed to fetch recently played tracks: " + e.getMessage());
             return Optional.empty();
         }
+    }
+    
+//  Playlist templates added
+    public List<Track> getRecommendationsFromTemplate(PlaylistTemplate template, String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        // Build Spotify recommendations URL
+        String url = SPOTIFY_API_URL + "/recommendations"
+                + "?limit=50"
+                + "&seed_genres=" + String.join(",", template.getSeedGenres())
+                + "&target_energy=" + (template.getTargetEnergy() / 100.0) // Spotify expects 0–1
+                + "&target_tempo=" + template.getTargetTempo();
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+
+        List<Track> tracks = new ArrayList<>();
+        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("tracks");
+            if (items != null) {
+                for (Map<String, Object> item : items) {
+                    tracks.add(mapToTrack(item));
+                }
+            }
+        }
+
+        // Apply filters (respect explicit flag from template)
+        tracks = applyFilters(tracks, !template.isIncludeExplicit(), false, false);
+
+        // Shuffle and limit
+        Collections.shuffle(tracks);
+        return tracks.stream().limit(20).collect(Collectors.toList());
     }
 }
