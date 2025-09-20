@@ -21,4 +21,5 @@ public class Track {
     private List<String> artists;
     private List<String> genres;
     private String artistName;
+    private String imageUrl;
 }

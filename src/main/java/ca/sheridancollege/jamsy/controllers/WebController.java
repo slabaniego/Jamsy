@@ -29,12 +29,14 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -229,70 +231,79 @@ public class WebController {
     }
 
     @PostMapping("/select-artists/submit")
-    public String handleArtistSelection(
-            @RequestParam(name = "selectedArtists", required = false) List<String> selectedArtists,
+    public String handleArtistSelection(@RequestParam("selectedArtists") List<String> selectedArtistIds,
+            @RequestParam("artistNames") String artistNamesJson,
             @RequestParam("workout") String workout,
             @RequestParam("mood") String mood,
             @RequestParam("action") String action,
-            HttpSession session,
-            Model model) {
-    	
+            Model model,
+            HttpSession session) {
+        
     	try {
-            String accessToken = spotifyService.ensureValidAccessToken(session);
-
-            System.out.println("Form submitted with:");
-            System.out.println("Selected artists: " + selectedArtists);
+            ObjectMapper mapper = new ObjectMapper();
+            List<String> artistNames = mapper.readValue(artistNamesJson, new TypeReference<List<String>>() {});
+            
+            System.out.println("=== SELECTED ARTISTS ===");
+            System.out.println("IDs: " + selectedArtistIds);
+            System.out.println("Names: " + artistNames);
             System.out.println("Workout: " + workout);
             System.out.println("Mood: " + mood);
             System.out.println("Action: " + action);
-
-            // Get the categorized artists from session
-            List<Map<String, Object>> categorizedArtists = (List<Map<String, Object>>) session.getAttribute("categorizedArtists");
             
-            if (categorizedArtists == null) {
-                return "redirect:/playlist-templates";
-            }
-
-            // Filter artists by the selected workout category
-            List<Map<String, Object>> filteredArtists = categorizedArtists.stream()
-                .filter(artist -> {
-                    List<String> categories = (List<String>) artist.get("workoutCategories");
-                    return categories != null && categories.contains(workout);
-                })
-                .limit(20)
-                .collect(Collectors.toList());
-
-            // Add artists to model for re-rendering
-            model.addAttribute("artists", filteredArtists);
-            model.addAttribute("workout", workout);
-            model.addAttribute("mood", mood);
-
-            if (selectedArtists == null || selectedArtists.size() != 5) {
-                System.out.println("Validation failed - need exactly 5 artists, got: " + (selectedArtists != null ? selectedArtists.size() : "null"));
-                model.addAttribute("error", "Please select exactly 5 artists");
-                return "select-artists";
-            }
-
-            // Save selected artist IDs in session
-            session.setAttribute("selectedArtists", selectedArtists);
-            session.setAttribute("selectedWorkout", workout);
-            session.setAttribute("selectedMood", mood);
-            session.setAttribute("selectedAction", action);
-
-            // Redirect based on the action
             if ("discover".equals(action)) {
-                return "redirect:/discover";
-            } else if ("familiar".equals(action)) {
-                return "redirect:/familiar-playlist";
-            }
+                List<Track> tracks = discoveryService.getDiscoveryTracks(artistNames, workout, 25);
+                System.out.println("Found " + tracks.size() + " tracks for discovery");
+                
+                // Convert tracks to the format expected by the frontend
+                List<Map<String, Object>> frontendTracks = convertTracksForFrontend(tracks);
+                
+                model.addAttribute("tracksJson", mapper.writeValueAsString(frontendTracks));
+                model.addAttribute("tracks", tracks); // Keep original for debugging
+                model.addAttribute("workout", workout);
+                model.addAttribute("mood", mood);
+                model.addAttribute("seedArtists", artistNames);
+                model.addAttribute("isFamiliar", false);
+                
+                // Store in session for later use
+                session.setAttribute("discoveredTracks", tracks);
+                
+                return "tracks";
+            } /*else if ("familiar".equals(action)) {
+                // Handle familiar playlist creation
+                List<Track> tracks = familiarService.getFamiliarTracks(artistNames, workout, 15);
+                model.addAttribute("tracks", tracks);
+                model.addAttribute("workout", workout);
+                model.addAttribute("mood", mood);
+                return "familiar-results";
+            }*/
             
-            return "redirect:/playlist-templates";
-        } catch (AuthenticationRequiredException e) {
-            throw e;
         } catch (Exception e) {
-            model.addAttribute("error", "Error processing selection: " + e.getMessage());
-            return "redirect:/playlist-templates";
+            System.err.println("Error processing artist selection: " + e.getMessage());
+            e.printStackTrace();
+            model.addAttribute("error", "Error processing your selection: " + e.getMessage());
+            return "error";
         }
+        
+        model.addAttribute("error", "Invalid action specified");
+        return "error";
+    }
+    
+    private List<Map<String, Object>> convertTracksForFrontend(List<Track> tracks) {
+        List<Map<String, Object>> frontendTracks = new ArrayList<>();
+        
+        for (Track track : tracks) {
+            Map<String, Object> frontendTrack = new HashMap<>();
+            frontendTrack.put("id", UUID.randomUUID().toString()); // Generate unique ID
+            frontendTrack.put("name", track.getName());
+            frontendTrack.put("artists", Arrays.asList(track.getArtistName())); // Convert to list
+            frontendTrack.put("albumCover", track.getImageUrl() != null ? track.getImageUrl() : "/images/default-cover.jpg");
+            frontendTrack.put("previewUrl", null); // Last.fm doesn't provide preview URLs
+            frontendTrack.put("genres", Collections.emptyList()); // Empty genres for now
+            
+            frontendTracks.add(frontendTrack);
+        }
+        
+        return frontendTracks;
     }
     
     // Song list 
@@ -308,13 +319,21 @@ public class WebController {
                 return "redirect:/select-artists";
             }
 
-            // Use Last.fm only - no Spotify API calls that cause rate limiting
+            System.out.println("Processing discovery for artists: " + selectedArtists);
             
-            // Changed to 20 for now 
-            List<Track> tracks = discoveryService.getDiscoveryTracks(selectedArtists, workout, 20);
+            // Use enhanced discovery service
+            List<Track> tracks = discoveryService.getDiscoveryTracks(selectedArtists, workout, 50);
 
-            session.setAttribute("discoveryTracks", tracks);
-            
+            if (tracks.isEmpty()) {
+                model.addAttribute("error", "No matching tracks found. Please try different artists.");
+                // Return to select-artists with preserved context
+                String workoutType = (String) session.getAttribute("selectedWorkout");
+                String moodType = (String) session.getAttribute("selectedMood");
+                model.addAttribute("workout", workoutType);
+                model.addAttribute("mood", moodType);
+                return "select-artists";
+            }
+
             // Convert to JSON for Thymeleaf/JS
             ObjectMapper mapper = new ObjectMapper();
             try {
@@ -329,14 +348,16 @@ public class WebController {
             model.addAttribute("mood", mood);
             model.addAttribute("isFamiliar", false);
 
+            System.out.println("Successfully found " + tracks.size() + " tracks");
             return "tracks";
             
         } catch (Exception e) {
+            System.out.println("Error in discover: " + e.getMessage());
+            e.printStackTrace();
             model.addAttribute("error", "Error discovering tracks: " + e.getMessage());
             return "redirect:/playlist-templates";
         }
     }
-
 
     @PostMapping("/track/like")
     @ResponseBody
@@ -612,42 +633,6 @@ public class WebController {
         return track;
     }
 
-    /*
-    @GetMapping("/recommend")
-    public String mixedTracks(@RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient client,
-                              HttpSession session, Model model) {
-        try {
-            String accessToken = client.getAccessToken().getTokenValue();
-            session.setAttribute("accessToken", accessToken);
-            session.setAttribute("refreshToken", client.getRefreshToken().getTokenValue());
-            session.setAttribute("accessTokenExpiry", System.currentTimeMillis() + 3600000);
-
-            Track randomTrack = spotifyService.getRandomSpotifyTrack(accessToken);
-            
-            if (randomTrack == null) return "error";
-
-            String trackName = randomTrack.getName();
-            String artistName = randomTrack.getArtists() != null && !randomTrack.getArtists().isEmpty()
-                                ? randomTrack.getArtists().get(0)
-                                : "";
-
-            // Step 2: Get Last.fm similar tracks
-            List<Track> lastFmSimilar = lastFmService.getSimilarTracksFromRandomSpotifyTrack(
-                trackName, artistName, deezerService
-            );
-
-            // Step 3: Add to model
-            model.addAttribute("tracks", lastFmSimilar);
-            model.addAttribute("tracksJson", new Gson().toJson(lastFmSimilar));
-            System.out.println("From recommend --> mixedTracks");
-            return "tracks";
-        } catch (Exception e) {
-            model.addAttribute("error", "Error loading recommendations: " + e.getMessage());
-            return "tracks";
-        }
-    }*/
-
-    
     @PostMapping("/recommend")
     public String recommendTracks(
             HttpSession session,
