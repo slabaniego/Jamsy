@@ -2,232 +2,182 @@ package ca.sheridancollege.jamsy.services;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import ca.sheridancollege.jamsy.beans.Track;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
-
 @Service
 public class LastFmService {
 
+    private final RestTemplate restTemplate;
+    
     @Value("${lastfm.api.key}")
     private String apiKey;
     
-    private static final String BASE_URL = "http://ws.audioscrobbler.com/2.0/";
+    @Value("${lastfm.api.base-url}")
+    private String baseUrl;
 
-    private final RestTemplate restTemplate = new RestTemplate();
-
-    /**
-     * Get genres (tags) for a specific track and artist.
-     */
-    public List<String> getGenresForTrack(String trackName, String artistName) {
-        String url = BASE_URL + "?method=track.getInfo&api_key=" + apiKey
-                + "&track=" + trackName + "&artist=" + artistName + "&format=json";
-
-        ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-        if (response.getBody() == null || response.getBody().get("track") == null) return List.of();
-
-        Map<String, Object> trackInfo = (Map<String, Object>) response.getBody().get("track");
-        Map<String, Object> topTags = (Map<String, Object>) trackInfo.get("toptags");
-
-        if (topTags != null && topTags.get("tag") instanceof List) {
-            List<Map<String, Object>> tagList = (List<Map<String, Object>>) topTags.get("tag");
-            List<String> genres = new ArrayList<>();
-            for (Map<String, Object> tag : tagList) {
-                genres.add((String) tag.get("name"));
-            }
-            return genres;
-        }
-
-        return List.of();
+    public LastFmService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
 
-    /**
-     * Get genres related to a genre.
-     */
-    public List<String> getSimilarGenres(String genre) {
-        String url = BASE_URL + "?method=tag.getSimilar&api_key=" + apiKey + "&tag=" + genre + "&format=json";
-
-        ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-        if (response.getBody() == null || response.getBody().get("tags") == null) return List.of();
-
-        Map<String, Object> tagsObj = (Map<String, Object>) response.getBody().get("tags");
-
-        if (tagsObj.get("tag") instanceof List) {
-            List<Map<String, Object>> similarTags = (List<Map<String, Object>>) tagsObj.get("tag");
-            List<String> similarGenres = new ArrayList<>();
-            for (Map<String, Object> tag : similarTags) {
-                similarGenres.add((String) tag.get("name"));
-            }
-            return similarGenres;
-        }
-
-        return List.of();
-    }
-
-    
-    // Get similar tracks based on one track and artist (for recommendations)
-     
-    public List<Map<String, Object>> getSimilarTracks(String trackName, String artistName) {
-        String url = BASE_URL + "?method=track.getSimilar&track=" + trackName + "&artist=" + artistName
-                + "&api_key=" + apiKey + "&format=json";
-
-        ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-        if (response.getBody() == null || response.getBody().get("similartracks") == null) return List.of();
-
-        Map<String, Object> similarTracksWrapper = (Map<String, Object>) response.getBody().get("similartracks");
-
-        List<Map<String, Object>> similarTracks = new ArrayList<>();
-        if (similarTracksWrapper.get("track") instanceof List) {
-            similarTracks = (List<Map<String, Object>>) similarTracksWrapper.get("track");
-        } else if (similarTracksWrapper.get("track") instanceof Map) {
-            // sometimes Last.fm returns a single object instead of a list
-            similarTracks.add((Map<String, Object>) similarTracksWrapper.get("track"));
-        }
-
-        return similarTracks;
-    }
-    
-    private Track mapLastFmTrack(Map<String, Object> data, String tag) {
-        Track track = new Track();
-
-        track.setName((String) data.get("name"));
-
-        Map<String, Object> artist = (Map<String, Object>) data.get("artist");
-        if (artist != null) {
-            track.setArtists(List.of((String) artist.get("name")));
-        }
-
-        List<Map<String, Object>> images = (List<Map<String, Object>>) data.get("image");
-        if (images != null && !images.isEmpty()) {
-            Map<String, Object> lastImage = images.get(images.size() - 1);
-            track.setAlbumCover((String) lastImage.get("#text"));
-        }
-
-        track.setPreviewUrl(null); // fallback can be added here
-        track.setGenres(List.of(tag)); // use the random tag
-
-        return track;
-    }
-
-    public Track mapLastFmTrackPublic(Map<String, Object> data, String tag) {
-        return mapLastFmTrack(data, tag);
-    }
-    
-    public List<Track> getRecommendedTracksFromLastFm(String tag) {
-        String url = "http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag="
-                     + URLEncoder.encode(tag, StandardCharsets.UTF_8)
-                     + "&api_key=" + apiKey + "&format=json";
-
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
-        Map<String, Object> responseBody = response.getBody();
-
-        if (responseBody == null || !responseBody.containsKey("tracks")) {
-            return new ArrayList<>();
-        }
-
-        Map<String, Object> tracksWrapper = (Map<String, Object>) responseBody.get("tracks");
-        List<Map<String, Object>> trackData = (List<Map<String, Object>>) tracksWrapper.get("track");
-
-        List<Track> tracks = new ArrayList<>();
-        for (Map<String, Object> data : trackData) {
-            tracks.add(mapLastFmTrack(data, tag));
-        }
-
-        return trackData.stream()
-        	    .map(data -> mapLastFmTrack(data, tag))
-        	    .collect(Collectors.toList());
-    }
-
-
-    public List<Track> getFreshLastFmRecommendations() {
-        String[] tags = {"indie", "jazz", "rnb", "lofi", "rock", "pop", "hip-hop"};
-        String tag = tags[new Random().nextInt(tags.length)];
-
-        String url = BASE_URL + "?method=tag.gettoptracks&tag="
-                     + URLEncoder.encode(tag, StandardCharsets.UTF_8)
-                     + "&api_key=" + apiKey + "&format=json";
-
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
-        Map<String, Object> body = response.getBody();
-
-        if (body == null || body.get("tracks") == null) return List.of();
-
-        List<Map<String, Object>> trackData = (List<Map<String, Object>>)
-                ((Map<String, Object>) body.get("tracks")).get("track");
-
-        Collections.shuffle(trackData); // 🔄 shuffle here
-
-        return trackData.stream()
-                .limit(15) // 🔢 optionally limit to avoid repeats
-                .map(data -> mapLastFmTrack(data, tag))
-                .collect(Collectors.toList());
-    }
-    
-    public List<Track> getSimilarTracksFromRandomSpotifyTrack(String name, String artist, 
-    	    boolean excludeExplicit, boolean excludeLove, boolean excludeFolk, 
-    	    DeezerService deezerService) {
-    	    
-    	    List<Map<String, Object>> similar = getSimilarTracks(name, artist);
-    	    Collections.shuffle(similar);
-
-    	    return similar.stream()
-    	        .map(data -> {
-    	            Track track = mapLastFmTrack(data, "similar");
-    	            
-    	            // First try Spotify preview, then Deezer fallback
-    	            if (track.getPreviewUrl() == null) {
-    	                String deezerPreview = deezerService.getPreviewUrlFallback(
-    	                    track.getName(), 
-    	                    track.getArtists()
-    	                );
-    	                track.setPreviewUrl(deezerPreview);
-    	            }
-
-    	            // Ensure album cover exists
-    	            if (track.getAlbumCover() == null) {
-    	                String cover = deezerService.getAlbumCoverFallback(
-    	                    track.getName(), 
-    	                    track.getArtists()
-    	                );
-    	                track.setAlbumCover(cover);
-    	            }
-
-    	            return track;
-    	        })
-    	        .filter(Objects::nonNull)
-    	        .limit(20)
-    	        .collect(Collectors.toList());
-    	}
-    
-    public List<Track> getSimilarTracksWithPopularity(String name, String artist, int maxPopularity) {
-        List<Map<String, Object>> similar = getSimilarTracks(name, artist);
-        Collections.shuffle(similar);
-
-        return similar.stream()
-            .map(data -> {
-                Track track = mapLastFmTrack(data, "similar");
-                
-                // Calculate popularity based on listeners count
-                if (data.containsKey("listeners")) {
-                    int listeners = Integer.parseInt(data.get("listeners").toString());
-                    int popularity = Math.min(100, listeners / 1000); // Scale listeners to 0-100
-                    track.setPopularity(popularity);
-                } else {
-                    track.setPopularity(30); // Default for obscure tracks
+    public List<String> getArtistGenres(String artistName) {
+        try {
+            String url = baseUrl + "?method=artist.getInfo&artist=" + 
+                        URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
+                        "&api_key=" + apiKey + "&format=json";
+            
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                Map<String, Object> body = response.getBody();
+                if (body != null && body.containsKey("artist")) {
+                    Map<String, Object> artist = (Map<String, Object>) body.get("artist");
+                    if (artist.containsKey("tags")) {
+                        Map<String, Object> tags = (Map<String, Object>) artist.get("tags");
+                        if (tags.containsKey("tag")) {
+                            List<Map<String, Object>> tagList = (List<Map<String, Object>>) tags.get("tag");
+                            return tagList.stream()
+                                .map(tag -> (String) tag.get("name"))
+                                .collect(Collectors.toList());
+                        }
+                    }
                 }
-
-                return track;
-            })
-            .filter(t -> t.getPopularity() < maxPopularity)
-            .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            System.out.println("Error getting genres for " + artistName + ": " + e.getMessage());
+        }
+        return Collections.emptyList();
     }
 
+    public List<String> getSimilarArtists(String artistName, int limit) {
+        try {
+            String url = baseUrl + "?method=artist.getSimilar&artist=" + 
+                        URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
+                        "&api_key=" + apiKey + "&format=json&limit=" + limit;
+            
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                Map<String, Object> body = response.getBody();
+                if (body != null && body.containsKey("similarartists")) {
+                    Map<String, Object> similarArtists = (Map<String, Object>) body.get("similarartists");
+                    if (similarArtists.containsKey("artist")) {
+                        List<Map<String, Object>> artistList = (List<Map<String, Object>>) similarArtists.get("artist");
+                        return artistList.stream()
+                            .map(artist -> (String) artist.get("name"))
+                            .limit(limit)
+                            .collect(Collectors.toList());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error getting similar artists for " + artistName + ": " + e.getMessage());
+        }
+        return Collections.emptyList();
+    }
+
+    public List<Track> getArtistTopTracks(String artistName, int limit) {
+        try {
+            String url = baseUrl + "?method=artist.getTopTracks&artist=" + 
+                        URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
+                        "&api_key=" + apiKey + "&format=json&limit=" + limit;
+            
+            System.out.println("Fetching Last.fm tracks for: " + artistName);
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                Map<String, Object> body = response.getBody();
+                if (body != null && body.containsKey("toptracks")) {
+                    Map<String, Object> topTracks = (Map<String, Object>) body.get("toptracks");
+                    if (topTracks.containsKey("track")) {
+                        List<Map<String, Object>> trackList = (List<Map<String, Object>>) topTracks.get("track");
+                        
+                        System.out.println("Found " + trackList.size() + " tracks for " + artistName);
+                        
+                        List<Track> result = trackList.stream()
+                            .map(trackMap -> {
+                                Track track = new Track();
+                                
+                                // Set track name
+                                if (trackMap.containsKey("name")) {
+                                    track.setName((String) trackMap.get("name"));
+                                }
+                                
+                                // Set artist name
+                                if (trackMap.containsKey("artist")) {
+                                    Map<String, Object> artist = (Map<String, Object>) trackMap.get("artist");
+                                    if (artist.containsKey("name")) {
+                                        track.setArtistName((String) artist.get("name"));
+                                    }
+                                }
+                                
+                                // Set image URL
+                                if (trackMap.containsKey("image")) {
+                                    List<Map<String, Object>> images = (List<Map<String, Object>>) trackMap.get("image");
+                                    if (images != null && !images.isEmpty()) {
+                                        // Try to get medium size image (index 1)
+                                        for (Map<String, Object> image : images) {
+                                            if (image.containsKey("size") && "medium".equals(image.get("size")) && 
+                                                image.containsKey("#text")) {
+                                                String imageUrl = (String) image.get("#text");
+                                                if (imageUrl != null && !imageUrl.isEmpty()) {
+                                                    track.setImageUrl(imageUrl);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                System.out.println("Track: " + track.getName() + " by " + track.getArtistName());
+                                return track;
+                            })
+                            .limit(limit)
+                            .collect(Collectors.toList());
+                        
+                        return result;
+                    }
+                }
+            } else {
+                System.out.println("Last.fm API error: " + response.getStatusCode());
+            }
+        } catch (Exception e) {
+            System.out.println("Error getting top tracks for " + artistName + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+        return Collections.emptyList();
+    }
+
+    public boolean artistMatchesWorkout(String artistName, String workout) {
+        List<String> genres = getArtistGenres(artistName);
+        
+        // Map workouts to relevant genres
+        Map<String, List<String>> workoutGenres = Map.of(
+            "cardio", Arrays.asList("electronic", "dance", "pop", "hip hop", "edm", "house", "techno", "trance"),
+            "strength", Arrays.asList("rock", "metal", "hard rock", "punk", "alternative", "industrial"),
+            "yoga", Arrays.asList("ambient", "chillout", "meditation", "new age", "classical", "folk"),
+            "running", Arrays.asList("pop", "indie", "alternative", "electropop", "synthpop")
+        );
+        
+        List<String> targetGenres = workoutGenres.getOrDefault(workout.toLowerCase(), 
+            Arrays.asList("pop", "electronic", "dance")); // Default genres
+        
+        // Check if any of the artist's genres match the workout genres
+        return genres.stream()
+            .anyMatch(genre -> targetGenres.stream()
+                .anyMatch(target -> genre.toLowerCase().contains(target.toLowerCase())));
+    }
 }

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Swipe Complete</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .track-list {
+            text-align: left;
+            margin: 20px 0;
+        }
+        .track-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .btn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Discovery Complete!</h1>
+        <p>You liked <span th:text="${trackCount}"></span> songs for your <span th:text="${workout}"></span> workout</p>
+        
+        <div class="track-list" th:if="${not #lists.isEmpty(likedTracks)}">
+            <h3>Your Liked Tracks:</h3>
+            <div class="track-item" th:each="track : ${likedTracks}">
+                <strong th:text="${track.name}"></strong> - 
+                <span th:text="${track.artists != null ? #strings.join(track.artists, ', ') : 'Unknown Artist'}"></span>
+            </div>
+        </div>
+        
+        <div>
+            <a href="/create-playlist" class="btn">Create Spotify Playlist</a>
+            <a href="/playlist-templates" class="btn">Start Over</a>
+        </div>
+    </div>
+</body>
+</html>

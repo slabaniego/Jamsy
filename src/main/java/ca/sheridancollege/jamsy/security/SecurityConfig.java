@@ -32,7 +32,8 @@ public class SecurityConfig {
 	        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 	        .oauth2Login(oauth2 -> oauth2
 	            .loginPage("/login")
-	            .defaultSuccessUrl("/filters", true)
+	            .defaultSuccessUrl("/playlist-templates", true)
+	            
 	        );
 
 	    return http.build();
@@ -47,7 +48,7 @@ public class SecurityConfig {
         return ClientRegistration.withRegistrationId("spotify")
             .clientId(clientId)
             .clientSecret(clientSecret)
-            .scope("user-top-read", "user-library-read", "user-read-recently-played")
+            .scope("user-top-read", "user-library-read", "user-read-recently-played", "user-read-private", "playlist-modify-private", "playlist-modify-public") // Added user-read-private
             .authorizationUri("https://accounts.spotify.com/authorize")
             .tokenUri("https://accounts.spotify.com/api/token")
             .userInfoUri("https://api.spotify.com/v1/me")

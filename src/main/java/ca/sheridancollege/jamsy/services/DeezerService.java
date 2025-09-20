@@ -1,11 +1,16 @@
 package ca.sheridancollege.jamsy.services;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import ca.sheridancollege.jamsy.beans.Track;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class DeezerService {
@@ -92,6 +97,44 @@ public class DeezerService {
     }
 
 
+    public List<Track> getArtistTopTracks(String artistName, int limit) {
+        try {
+            // Implement Deezer API call here
+            String url = "https://api.deezer.com/search?q=artist:\"" + 
+                         URLEncoder.encode(artistName, StandardCharsets.UTF_8) + 
+                         "\"&limit=" + limit;
+            
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+                List<Map<String, Object>> data = (List<Map<String, Object>>) body.get("data");
+                
+                return data.stream()
+                    .map(trackMap -> {
+                        Track track = new Track();
+                        track.setId("deezer-" + trackMap.get("id"));
+                        track.setName((String) trackMap.get("title"));
+                        track.setPreviewUrl((String) trackMap.get("preview"));
+                        
+                        // Extract artist information
+                        Map<String, Object> artistInfo = (Map<String, Object>) trackMap.get("artist");
+                        if (artistInfo != null) {
+                            track.setArtistName((String) artistInfo.get("name"));
+                        }
+                        
+                        return track;
+                    })
+                    .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            System.out.println("Deezer API error for artist " + artistName + ": " + e.getMessage());
+        }
+        return Collections.emptyList();
+    }
+    
+    
+    
     public String getAlbumCoverFallback(String trackName, List<String> artistNames) {
         List<Map<String, Object>> results = searchTrack(trackName);
         for (Map<String, Object> track : results) {
