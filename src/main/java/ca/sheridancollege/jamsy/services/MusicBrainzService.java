@@ -8,6 +8,8 @@ import java.util.Random;
 import java.util.stream.Collectors;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -105,6 +107,24 @@ public class MusicBrainzService {
             return Collections.emptyList();
         }
     }
+    
+    private String getArtistNameFromMusicBrainz(String spotifyArtistId) {
+        try {
+            String url = "https://musicbrainz.org/ws/2/artist?query=arid:" + spotifyArtistId + "&fmt=json";
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                List<Map<String, Object>> artists = (List<Map<String, Object>>) response.getBody().get("artists");
+                if (artists != null && !artists.isEmpty()) {
+                    return (String) artists.get(0).get("name");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("MusicBrainz lookup failed: " + e.getMessage());
+        }
+        return null;
+    }
+
     
     /**
      * Get genres for a specific artist from MusicBrainz
