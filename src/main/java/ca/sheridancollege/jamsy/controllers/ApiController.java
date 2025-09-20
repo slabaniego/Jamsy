@@ -37,6 +37,7 @@ public class ApiController {
     /**
      * Returns recommended tracks for the Android app
      */
+    /*
     @GetMapping("/tracks")
     public Map<String, Object> getTracks(
             @RequestParam(defaultValue = "true") boolean excludeExplicit,
@@ -48,10 +49,6 @@ public class ApiController {
             // Get recommended tracks from LastFM service
             List<Track> tracks = lastFmService.getFreshLastFmRecommendations();
             
-            // Apply filtering if needed using SpotifyService (which has the filtering logic)
-            if (excludeExplicit || excludeLoveSongs || excludeFolk) {
-                tracks = spotifyService.applyFilters(tracks, excludeExplicit, excludeLoveSongs, excludeFolk);
-            }
             
             // Enrich tracks with preview URLs and album covers
             for (Track track : tracks) {
@@ -71,7 +68,7 @@ public class ApiController {
             response.put("error", e.getMessage());
         }
         return response;
-    }
+    }*/
     
     /**
      * Handles like/unlike actions for tracks
@@ -172,9 +169,11 @@ public class ApiController {
         }
     }
     
+    
     /**
      * Get personalized recommendations
      */
+    /*
     @GetMapping("/recommendations")
     public ResponseEntity<Map<String, Object>> getRecommendations() {
         Map<String, Object> response = new HashMap<>();
@@ -245,7 +244,7 @@ public class ApiController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+    */
     /**
      * Get random track to start recommendations
      */
@@ -277,6 +276,7 @@ public class ApiController {
     /**
      * Get similar tracks based on a track
      */
+    /*
     @GetMapping("/similar-tracks")
     public ResponseEntity<Map<String, Object>> getSimilarTracks(
             @RequestParam String trackName,
@@ -297,5 +297,5 @@ public class ApiController {
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
-    }
+    }*/
 }

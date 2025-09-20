@@ -10,8 +10,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Track {
-	private String externalUrl;
-	private int popularity;
+	private String id;
+    private String externalUrl;
+    private int popularity;
     private String name;
     private String isrc;
     private boolean explicit;
@@ -19,4 +20,5 @@ public class Track {
     private String albumCover;
     private List<String> artists;
     private List<String> genres;
+    private String artistName;
 }
