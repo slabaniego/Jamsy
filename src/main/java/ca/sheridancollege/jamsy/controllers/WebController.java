@@ -295,6 +295,7 @@ public class WebController {
         }
     }
     
+    // Song list 
     @GetMapping("/discover")
     public String discoverTracks(HttpSession session, Model model) {
         try {
@@ -308,8 +309,12 @@ public class WebController {
             }
 
             // Use Last.fm only - no Spotify API calls that cause rate limiting
-            List<Track> tracks = discoveryService.getDiscoveryTracks(selectedArtists, workout, 50);
+            
+            // Changed to 20 for now 
+            List<Track> tracks = discoveryService.getDiscoveryTracks(selectedArtists, workout, 20);
 
+            session.setAttribute("discoveryTracks", tracks);
+            
             // Convert to JSON for Thymeleaf/JS
             ObjectMapper mapper = new ObjectMapper();
             try {
@@ -382,18 +387,30 @@ public class WebController {
                     likedTracks = new ArrayList<>();
                     session.setAttribute("likedTracks", likedTracks);
                 }
-                
-                // Find the track in discovery tracks and add to liked tracks
+
                 List<Track> discoveryTracks = (List<Track>) session.getAttribute("discoveryTracks");
+                System.out.println("🟢 discoveryTracks in session: " + (discoveryTracks != null ? discoveryTracks.size() : 0));
+
                 if (discoveryTracks != null) {
-                    discoveryTracks.stream()
-                        .filter(track -> track.getName().equals(songName) && 
-                                track.getArtists() != null && 
-                                track.getArtists().contains(artist))
-                        .findFirst()
-                        .ifPresent(likedTracks::add);
+                    for (Track track : discoveryTracks) {
+                        System.out.println("Checking " + track.getName() + " vs " + songName);
+                        System.out.println("Artists in track: " + track.getArtists() + " vs payload artist: " + artist);
+
+                        if (track.getName() != null &&
+                            track.getName().equalsIgnoreCase(songName) &&
+                            track.getArtists() != null &&
+                            track.getArtists().stream().anyMatch(a -> a.equalsIgnoreCase(artist))) {
+
+                            likedTracks.add(track);
+                            System.out.println("✅ Added to likedTracks: " + track.getName() + " by " + track.getArtists());
+                            break;
+                        }
+                    }
                 }
+
+                System.out.println("❤️ likedTracks size after like: " + likedTracks.size());
             }
+
 
             response.put("success", true);
             response.put("message", "Action processed successfully");
@@ -407,46 +424,82 @@ public class WebController {
         return response;
     }
     
+    
+	/* Users to see what they liked */
+    @GetMapping("/liked")
+    public String showLiked(HttpSession session, Model model) {
+        List<Track> likedTracks = (List<Track>) session.getAttribute("likedTracks");
+        if (likedTracks == null) likedTracks = new ArrayList<>();
+
+        System.out.println("📀 likedTracks in session: " + likedTracks.size());
+
+        model.addAttribute("tracksJson", new Gson().toJson(likedTracks));
+        model.addAttribute("tracks", likedTracks);
+        
+        return "liked"; // goes to liked.html
+    }
+
+    
     @GetMapping("/create-playlist")
     public String createPlaylist(HttpSession session, Model model) {
-        
         try {
             String accessToken = spotifyService.ensureValidAccessToken(session);
             List<Track> likedTracks = (List<Track>) session.getAttribute("likedTracks");
             String workout = (String) session.getAttribute("selectedWorkout");
-            
+
+            // ✅ Fix loop: redirect to liked page if empty
             if (likedTracks == null || likedTracks.isEmpty()) {
                 model.addAttribute("error", "No liked tracks to create playlist");
-                return "redirect:/tracks";
+                return "redirect:/liked";
             }
-            
+
             // Create Spotify playlist
-            String playlistName = workout + " Workout Mix - " + likedTracks.size() + " Songs";
+            String playlistName = (workout != null ? workout + " " : "")
+                    + "Workout Mix - " + likedTracks.size() + " Songs";
             String playlistId = spotifyService.createPlaylist(accessToken, playlistName);
-            
-            // Add tracks to playlist
-            List<String> trackUris = likedTracks.stream()
-                .map(Track::getId)
-                .filter(java.util.Objects::nonNull)
-                .map(id -> "spotify:track:" + id)
-                .collect(Collectors.toList());
-            
+
+            // Add tracks
+         // Add tracks - resolve Spotify IDs if needed
+            List<String> trackUris = new ArrayList<>();
+
+            for (Track track : likedTracks) {
+                String id = track.getId();
+
+                // If it's not a valid Spotify ID, search by name + artist
+                if (id == null || !id.matches("^[0-9A-Za-z]{22}$")) { // Spotify IDs are 22 chars long
+                    String artist = (track.getArtists() != null && !track.getArtists().isEmpty())
+                            ? track.getArtists().get(0)
+                            : "";
+                    id = spotifyService.searchTrackId(track.getName(), artist, accessToken);
+                    System.out.println("🔎 Resolved track " + track.getName() + " → " + id);
+                }
+
+                if (id != null) {
+                    trackUris.add("spotify:track:" + id);
+                } else {
+                    System.out.println("⚠️ Could not resolve Spotify ID for " + track.getName());
+                }
+            }
+
+            System.out.println("🎵 Adding " + trackUris.size() + " tracks to playlist");
+
             if (!trackUris.isEmpty()) {
                 spotifyService.addTracksToPlaylist(accessToken, playlistId, trackUris);
             }
-            
+
+
             model.addAttribute("playlistName", playlistName);
             model.addAttribute("trackCount", likedTracks.size());
             model.addAttribute("likedTracks", likedTracks);
-            
+
             return "playlist-created";
-            
+
         } catch (AuthenticationRequiredException e) {
             throw e;
         } catch (Exception e) {
             System.out.println("❌ Error creating playlist: " + e.getMessage());
             model.addAttribute("error", "Error creating playlist: " + e.getMessage());
-            return "redirect:/tracks";
+            return "redirect:/liked"; // ✅ fallback goes to liked page, not tracks
         }
     }
     
@@ -481,6 +534,9 @@ public class WebController {
             // Shuffle and limit to 20 tracks
             Collections.shuffle(familiarTracks);
             familiarTracks = familiarTracks.stream().limit(20).collect(Collectors.toList());
+            
+            // Store in session for handle-action
+            session.setAttribute("discoveryTracks", familiarTracks);
             
             if (familiarTracks.isEmpty()) {
                 model.addAttribute("error", "No familiar tracks found");

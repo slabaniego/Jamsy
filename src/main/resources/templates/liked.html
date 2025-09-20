@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Liked Songs</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+        h1 { margin-bottom: 20px; }
+        .track-list { display: flex; flex-wrap: wrap; gap: 15px; }
+        .track-card {
+            background: #fff; border: 1px solid #ddd; border-radius: 8px;
+            width: 200px; padding: 10px; text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .track-card img { width: 100%; border-radius: 6px; }
+        .track-name { font-weight: bold; margin-top: 8px; }
+        .track-artist { font-size: 0.9em; color: #555; }
+        .actions { margin-top: 30px; text-align: center; }
+        button {
+            padding: 10px 20px;
+            background: #1DB954; color: white; border: none;
+            border-radius: 25px; cursor: pointer; font-size: 1em;
+        }
+        button:hover { background: #18a148; }
+    </style>
+</head>
+<body>
+    <h1>❤️ Your Liked Songs</h1>
+
+    <div id="trackContainer" class="track-list"></div>
+
+    <div class="actions">
+        <form th:action="@{/create-playlist}" method="get">
+            <button type="submit">Export to Spotify</button>
+        </form>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const likedTracks = /*[[${tracksJson}]]*/ '[]';
+        const tracks = JSON.parse(likedTracks);
+
+        const container = document.getElementById("trackContainer");
+
+        if (tracks.length === 0) {
+            container.innerHTML = "<p>No liked songs yet. Go discover some music!</p>";
+        } else {
+            tracks.forEach(track => {
+                const card = document.createElement("div");
+                card.className = "track-card";
+
+                const img = document.createElement("img");
+                img.src = track.albumCover || "https://via.placeholder.com/200?text=No+Cover";
+                card.appendChild(img);
+
+                const name = document.createElement("div");
+                name.className = "track-name";
+                name.textContent = track.name;
+                card.appendChild(name);
+
+                const artists = document.createElement("div");
+                artists.className = "track-artist";
+                artists.textContent = track.artists ? track.artists.join(", ") : "Unknown Artist";
+                card.appendChild(artists);
+
+                container.appendChild(card);
+            });
+        }
+        /*]]>*/
+    </script>
+</body>
+</html>

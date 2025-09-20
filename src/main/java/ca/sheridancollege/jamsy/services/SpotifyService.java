@@ -1190,33 +1190,51 @@ return trackIds;
         return track;
     }
     */
+    
+    /**
+     * Search Spotify for a track ID by track name and artist name.
+     * If ID is missing, this can be used to populate it.
+     */
     public String searchTrackId(String trackName, String artistName, String accessToken) {
+        if (trackName == null || artistName == null || trackName.isBlank() || artistName.isBlank()) {
+            System.out.println("⚠️ searchTrackId called with invalid params: " + trackName + " / " + artistName);
+            return null;
+        }
+
         try {
-            String query = "track:" + URLEncoder.encode(trackName, "UTF-8") + 
-                          " artist:" + URLEncoder.encode(artistName, "UTF-8");
+            String query = "track:" + URLEncoder.encode(trackName, StandardCharsets.UTF_8) +
+                           " artist:" + URLEncoder.encode(artistName, StandardCharsets.UTF_8);
+
             String url = SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=1";
-            
+
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + accessToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
-            
+
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            
+
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 Map<String, Object> responseBody = response.getBody();
                 Map<String, Object> tracks = (Map<String, Object>) responseBody.get("tracks");
                 List<Map<String, Object>> items = (List<Map<String, Object>>) tracks.get("items");
-                
+
                 if (items != null && !items.isEmpty()) {
-                    return (String) items.get(0).get("id");
+                    Map<String, Object> trackData = items.get(0);
+                    String spotifyId = (String) trackData.get("id");
+
+                    System.out.println("✅ Found Spotify ID for " + trackName + " - " + artistName + ": " + spotifyId);
+                    return spotifyId;
+                } else {
+                    System.out.println("❌ No matching track found on Spotify for: " + trackName + " - " + artistName);
                 }
             }
         } catch (Exception e) {
-            System.out.println("Error searching track ID: " + e.getMessage());
+            System.out.println("❌ Error searching track ID for " + trackName + " - " + artistName + ": " + e.getMessage());
         }
+
         return null;
     }
-    
+
     public String getTrackPreviewUrl(String trackId, String accessToken) {
         try {
             String url = SPOTIFY_API_URL + "/tracks/" + trackId;
@@ -1303,70 +1321,6 @@ return trackIds;
         return Collections.emptyList();
     }
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
     public List<Track> getTopTracks(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);

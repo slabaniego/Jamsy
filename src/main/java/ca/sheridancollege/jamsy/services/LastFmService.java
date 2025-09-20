@@ -76,13 +76,13 @@ public class LastFmService {
                 "&api_key=" + apiKey +
                 "&format=json" +
                 "&limit=" + limit;
-            
+
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-            
+
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 Map<String, Object> body = response.getBody();
                 Map<String, Object> topTracks = (Map<String, Object>) body.get("toptracks");
-                
+
                 if (topTracks != null) {
                     List<Map<String, Object>> trackList = (List<Map<String, Object>>) topTracks.get("track");
                     if (trackList != null) {
@@ -91,13 +91,20 @@ public class LastFmService {
                                 Track track = new Track();
                                 track.setId("lastfm-" + UUID.randomUUID().toString());
                                 track.setName((String) trackMap.get("name"));
-                                
-                                // Get artist name
+
+                                // ✅ Set artists as a list
                                 Map<String, Object> artistInfo = (Map<String, Object>) trackMap.get("artist");
                                 if (artistInfo != null) {
-                                    track.setArtistName((String) artistInfo.get("name"));
+                                    String artistFromApi = (String) artistInfo.get("name");
+                                    if (artistFromApi != null && !artistFromApi.isBlank()) {
+                                        track.setArtists(List.of(artistFromApi));
+                                    } else {
+                                        track.setArtists(List.of("Unknown Artist"));
+                                    }
+                                } else {
+                                    track.setArtists(List.of("Unknown Artist"));
                                 }
-                                
+
                                 return track;
                             })
                             .limit(limit)
