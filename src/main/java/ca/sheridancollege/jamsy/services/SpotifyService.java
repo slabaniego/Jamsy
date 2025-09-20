@@ -1162,34 +1162,6 @@ return trackIds;
         return params;
     }
 
-    /*private Track mapSpotifyTrack(Map<String, Object> trackData) {
-        Track track = new Track();
-        track.setId((String) trackData.get("id"));
-        track.setName((String) trackData.get("name"));
-        track.setPreviewUrl((String) trackData.get("preview_url"));
-        track.setPopularity((Integer) trackData.get("popularity"));
-        
-        // Get artists
-        List<Map<String, Object>> artists = (List<Map<String, Object>>) trackData.get("artists");
-        List<String> artistNames = artists.stream()
-            .map(artist -> (String) artist.get("name"))
-            .collect(Collectors.toList());
-        track.setArtists(artistNames);
-        
-        // Get album cover
-        Map<String, Object> album = (Map<String, Object>) trackData.get("album");
-        List<Map<String, Object>> images = (List<Map<String, Object>>) album.get("images");
-        if (images != null && !images.isEmpty()) {
-            track.setAlbumCover((String) images.get(0).get("url"));
-        }
-        
-        // Get external URL
-        Map<String, Object> externalUrls = (Map<String, Object>) trackData.get("external_urls");
-        track.setExternalUrl((String) externalUrls.get("spotify"));
-        
-        return track;
-    }
-    */
     public String searchTrackId(String trackName, String artistName, String accessToken) {
         try {
             String query = "track:" + URLEncoder.encode(trackName, "UTF-8") + 

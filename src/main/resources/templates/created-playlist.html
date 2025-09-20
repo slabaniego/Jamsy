@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${playlistName} + ' Created'">Playlist Created</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f4f4f9;
+            text-align: center;
+            padding: 40px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            display: inline-block;
+            max-width: 600px;
+            width: 100%;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            margin: 8px 0;
+        }
+        a.button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+        a.button:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎉 Playlist Created!</h1>
+    <h2 th:text="${playlistName}">Playlist Name</h2>
+    <p><strong th:text="${trackCount}">0</strong> tracks were added to your Spotify playlist.</p>
+
+    <h3>Tracks Added:</h3>
+    <ul>
+        <li th:each="track : ${likedTracks}">
+            <span th:text="${track.name}">Track Name</span>
+            by <span th:text="${track.artists != null ? track.artists[0] : 'Unknown'}">Artist</span>
+        </li>
+    </ul>
+
+    <a class="button" href="/liked">⬅ Back to Liked Songs</a>
+</div>
+
+</body>
+</html>
