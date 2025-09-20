@@ -184,4 +184,21 @@ public class DiscoveryService {
             }
         }
     }
+    
+    /*private List<String> getArtistNames(List<String> artistIds) {
+        List<String> artistNames = new ArrayList<>();
+        for (String artistId : artistIds) {
+            try {
+                String artistName = spotifyService.getArtistName(artistId, "dummy-token");
+                if (artistName != null) {
+                    artistNames.add(artistName);
+                } else {
+                    artistNames.add("Artist-" + artistId.substring(0, 6));
+                }
+            } catch (Exception e) {
+                artistNames.add("Artist-" + artistId.substring(0, 6));
+            }
+        }
+        return artistNames;
+    }*/
 }
