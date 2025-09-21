@@ -1,0 +1,34 @@
+<h1>🎶 Preview Your Playlist</h1>
+<div id="trackContainer" class="track-list"></div>
+
+<div class="actions">
+    <form th:action="@{/create-playlist}" method="get">
+        <button type="submit">Confirm & Export to Spotify</button>
+    </form>
+</div>
+
+<script th:inline="javascript">
+	/*<![CDATA[*/
+	const tracks = [[${tracksJson}]];
+	console.log("Preview tracks:", tracks);
+	/*]]>*/
+
+    const container = document.getElementById("trackContainer");
+    if (tracks.length === 0) {
+        container.innerHTML = "<p>No playlist generated yet.</p>";
+    } else {
+        tracks.forEach(track => {
+            const card = document.createElement("div");
+            card.className = "track-card";
+
+            card.innerHTML = `
+                <img src="${track.albumCover || 'https://via.placeholder.com/200'}" />
+                <div class="track-name">${track.name}</div>
+                <div class="track-artist">${track.artists?.join(", ") || "Unknown Artist"}</div>
+                ${track.previewUrl ? `<audio controls src="${track.previewUrl}"></audio>` : ""}
+            `;
+
+            container.appendChild(card);
+        });
+    }
+</script>

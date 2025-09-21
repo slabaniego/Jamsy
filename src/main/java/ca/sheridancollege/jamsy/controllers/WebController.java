@@ -251,7 +251,7 @@ public class WebController {
             System.out.println("Action: " + action);
             
             if ("discover".equals(action)) {
-                List<Track> tracks = discoveryService.getDiscoveryTracks(artistNames, workout, 25);
+                List<Track> tracks = discoveryService.getDiscoveryTracks(artistNames, workout, 10);
                 System.out.println("Found " + tracks.size() + " tracks for discovery");
                 
                 // Convert tracks to the format expected by the frontend
@@ -265,7 +265,7 @@ public class WebController {
                 model.addAttribute("isFamiliar", false);
                 
                 // Store in session for later use
-                session.setAttribute("discoveredTracks", tracks);
+                session.setAttribute("discoveryTracks", tracks);
                 
                 return "tracks";
             } /*else if ("familiar".equals(action)) {
@@ -290,22 +290,43 @@ public class WebController {
     
     private List<Map<String, Object>> convertTracksForFrontend(List<Track> tracks) {
         List<Map<String, Object>> frontendTracks = new ArrayList<>();
-        
+
         for (Track track : tracks) {
             Map<String, Object> frontendTrack = new HashMap<>();
             frontendTrack.put("id", UUID.randomUUID().toString()); // Generate unique ID
             frontendTrack.put("name", track.getName());
-            frontendTrack.put("artists", Arrays.asList(track.getArtistName())); // Convert to list
-            frontendTrack.put("albumCover", track.getImageUrl() != null ? track.getImageUrl() : "/images/default-cover.jpg");
-            frontendTrack.put("previewUrl", null); // Last.fm doesn't provide preview URLs
-            frontendTrack.put("genres", Collections.emptyList()); // Empty genres for now
-            
+
+            // ✅ Handle artists more robustly
+            List<String> artistList = new ArrayList<>();
+            if (track.getArtists() != null && !track.getArtists().isEmpty()) {
+                artistList.addAll(track.getArtists());
+            } else if (track.getArtistName() != null && !track.getArtistName().isEmpty()) {
+                artistList.add(track.getArtistName());
+            } else {
+                artistList.add("Unknown Artist");
+            }
+            frontendTrack.put("artists", artistList);
+
+            // Album cover fallback
+            frontendTrack.put(
+                "albumCover",
+                track.getImageUrl() != null && !track.getImageUrl().isEmpty()
+                    ? track.getImageUrl()
+                    : "/images/default-cover.jpg"
+            );
+
+            // Preview and genres (not provided by Last.fm)
+            frontendTrack.put("previewUrl", track.getPreviewUrl() != null ? track.getPreviewUrl() : null);
+            frontendTrack.put("genres", track.getGenres() != null ? track.getGenres() : Collections.emptyList());
+
             frontendTracks.add(frontendTrack);
         }
-        
+
         return frontendTracks;
     }
+
     
+    // Song list 
     @GetMapping("/discover")
     public String discoverTracks(HttpSession session, Model model) {
         try {
@@ -358,7 +379,6 @@ public class WebController {
         }
     }
 
-
     @PostMapping("/track/like")
     @ResponseBody
     public String likeTrack(@RequestBody Map<String, String> request, HttpSession session) {
@@ -376,21 +396,6 @@ public class WebController {
         System.out.println("Disliked track: " + trackId);
         return "Disliked";
     }
-    
-    /* Users to see what they liked */
-    @GetMapping("/liked")
-    public String showLiked(HttpSession session, Model model) {
-        List<Track> likedTracks = (List<Track>) session.getAttribute("likedTracks");
-        if (likedTracks == null) likedTracks = new ArrayList<>();
-
-        System.out.println("📀 likedTracks in session: " + likedTracks.size());
-
-        model.addAttribute("tracksJson", new Gson().toJson(likedTracks));
-        model.addAttribute("tracks", likedTracks);
-        
-        return "liked"; // goes to liked.html
-    }
-
     
     @PostMapping("/handle-action")
     @ResponseBody
@@ -415,6 +420,7 @@ public class WebController {
             songAction.setGenres(genres);
             songAction.setAction(action);
             songActionRepo.save(songAction);
+            System.out.println("Payload → songName=" + songName + ", artist=" + artist);
 
             // Store liked tracks in session
             if ("like".equals(action)) {
@@ -423,18 +429,32 @@ public class WebController {
                     likedTracks = new ArrayList<>();
                     session.setAttribute("likedTracks", likedTracks);
                 }
-                
-                // Find the track in discovery tracks and add to liked tracks
+
                 List<Track> discoveryTracks = (List<Track>) session.getAttribute("discoveryTracks");
+                System.out.println("🟢 discoveryTracks in session: " + (discoveryTracks != null ? discoveryTracks.size() : 0));
+
                 if (discoveryTracks != null) {
-                    discoveryTracks.stream()
-                        .filter(track -> track.getName().equals(songName) && 
-                                track.getArtists() != null && 
-                                track.getArtists().contains(artist))
-                        .findFirst()
-                        .ifPresent(likedTracks::add);
+                    for (Track track : discoveryTracks) {
+                        System.out.println("Checking " + track.getName() + " vs " + songName);
+                        System.out.println("Artists in track: " + track.getArtists() + " vs payload artist: " + artist);
+
+                        if (track.getName() != null && track.getName().equalsIgnoreCase(songName)) {
+                            if (track.getArtists() == null || track.getArtists().isEmpty()) {
+                                likedTracks.add(track);
+                                System.out.println("✅ Added (name-only match): " + track.getName());
+                            } else if (track.getArtists().stream()
+                                      .anyMatch(a -> a.toLowerCase().contains(artist.toLowerCase()))) {
+                                likedTracks.add(track);
+                                System.out.println("✅ Added (name + artist match): " + track.getName() + " by " + track.getArtists());
+                            }
+                        }
+
+                    }
                 }
+
+                System.out.println("❤️ likedTracks size after like: " + likedTracks.size());
             }
+
 
             response.put("success", true);
             response.put("message", "Action processed successfully");
@@ -448,69 +468,20 @@ public class WebController {
         return response;
     }
     
-    @GetMapping("/create-playlist")
-    public String createPlaylist(HttpSession session, Model model) {
-        try {
-            String accessToken = spotifyService.ensureValidAccessToken(session);
-            List<Track> likedTracks = (List<Track>) session.getAttribute("likedTracks");
-            String workout = (String) session.getAttribute("selectedWorkout");
-
-            // ✅ Fix loop: redirect to liked page if empty
-            if (likedTracks == null || likedTracks.isEmpty()) {
-                model.addAttribute("error", "No liked tracks to create playlist");
-                return "redirect:/liked";
-            }
-
-            // Create Spotify playlist
-            String playlistName = (workout != null ? workout + " " : "")
-                    + "Workout Mix - " + likedTracks.size() + " Songs";
-            String playlistId = spotifyService.createPlaylist(accessToken, playlistName);
-
-            // Add tracks
-         // Add tracks - resolve Spotify IDs if needed
-            List<String> trackUris = new ArrayList<>();
-
-            for (Track track : likedTracks) {
-                String id = track.getId();
-
-                // If it's not a valid Spotify ID, search by name + artist
-                if (id == null || !id.matches("^[0-9A-Za-z]{22}$")) { // Spotify IDs are 22 chars long
-                    String artist = (track.getArtists() != null && !track.getArtists().isEmpty())
-                            ? track.getArtists().get(0)
-                            : "";
-                    id = spotifyService.searchTrackId(track.getName(), artist, accessToken);
-                    System.out.println("🔎 Resolved track " + track.getName() + " → " + id);
-                }
-
-                if (id != null) {
-                    trackUris.add("spotify:track:" + id);
-                } else {
-                    System.out.println("⚠️ Could not resolve Spotify ID for " + track.getName());
-                }
-            }
-
-            System.out.println("🎵 Adding " + trackUris.size() + " tracks to playlist");
-
-            if (!trackUris.isEmpty()) {
-                spotifyService.addTracksToPlaylist(accessToken, playlistId, trackUris);
-            }
-
-
-            model.addAttribute("playlistName", playlistName);
-            model.addAttribute("trackCount", likedTracks.size());
-            model.addAttribute("likedTracks", likedTracks);
-
-            return "playlist-created";
-
-        } catch (AuthenticationRequiredException e) {
-            throw e;
-        } catch (Exception e) {
-            System.out.println("❌ Error creating playlist: " + e.getMessage());
-            model.addAttribute("error", "Error creating playlist: " + e.getMessage());
-            return "redirect:/liked"; // ✅ fallback goes to liked page, not tracks
-        }
-    }
     
+	/* Users to see what they liked */
+    @GetMapping("/liked")
+    public String showLiked(HttpSession session, Model model) {
+        List<Track> likedTracks = (List<Track>) session.getAttribute("likedTracks");
+        if (likedTracks == null) likedTracks = new ArrayList<>();
+
+        System.out.println("📀 likedTracks in session: " + likedTracks.size());
+
+        model.addAttribute("tracksJson", new Gson().toJson(likedTracks));
+        model.addAttribute("tracks", likedTracks);
+        
+        return "liked"; // goes to liked.html
+    }
     
     @GetMapping("/familiar-playlist")
     public String createFamiliarPlaylist(HttpSession session, Model model) {
@@ -620,9 +591,6 @@ public class WebController {
         return track;
     }
 
-    
-
-    
     @PostMapping("/recommend")
     public String recommendTracks(
             HttpSession session,
@@ -646,6 +614,29 @@ public class WebController {
         }
     }
 
+    
+    @GetMapping("/search")
+    public String searchTracks(
+            HttpSession session,
+            @RequestParam String query,
+            @RequestParam(defaultValue = "false") boolean excludeExplicit,
+            @RequestParam(defaultValue = "false") boolean excludeLoveSongs,
+            @RequestParam(defaultValue = "false") boolean excludeFolk,
+            Model model) {
+
+        try {
+            String accessToken = spotifyService.ensureValidAccessToken(session);
+
+            List<Track> tracks = spotifyService.searchTrack(query, accessToken, excludeExplicit, excludeLoveSongs, excludeFolk);
+            model.addAttribute("tracks", tracks);
+            return "tracks";
+        } catch (AuthenticationRequiredException e) {
+            throw e;
+        } catch (Exception e) {
+            model.addAttribute("error", "Error searching tracks: " + e.getMessage());
+            return "tracks";
+        }
+    }
     
     @GetMapping("/tracks")
     public String tracks(

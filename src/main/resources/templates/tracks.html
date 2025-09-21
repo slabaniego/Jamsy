@@ -179,8 +179,8 @@
             </div>
             
             <button id="submitBtn" class="submit-btn" onclick="submitActions()" disabled>
-                🎵 Create My Playlist
-            </button>
+			    👀 View Generated Playlist
+			</button>
         </div>
     </div>
 </div>
@@ -281,9 +281,8 @@ function endOfTracks() {
 }
 
 function submitActions() {
-    // Redirect to server endpoint that creates playlist from session likedTracks
-    // Your controller has GET /create-playlist which reads likedTracks from session
-    window.location.href = '/create-playlist';
+    // Instead of creating playlist right away, show preview
+    window.location.href = '/preview-playlist';
 }
 
 // helper to avoid NPE when template doesn't provide genres

@@ -14,7 +14,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins("*")  // In production, specify your app's URL instead of *
+                .allowedOrigins("*")  // In production, specify app's URL instead of *
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(false)
@@ -26,3 +26,4 @@ public class WebConfig implements WebMvcConfigurer {
         return new RestTemplate();
     }
 }
+
