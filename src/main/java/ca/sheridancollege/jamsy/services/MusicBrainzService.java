@@ -268,31 +268,5 @@ public class MusicBrainzService {
             System.out.println("Error getting MusicBrainz obscure tracks: " + e.getMessage());
             return Collections.emptyList();
         }
-    }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    } 
 }
