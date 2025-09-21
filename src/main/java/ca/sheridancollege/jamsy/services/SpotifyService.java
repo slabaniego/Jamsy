@@ -1302,8 +1302,6 @@ return trackIds;
         }
         return null;
     }
-    
-    
 
     public List<String> searchArtistTopTracks(String artistName, String accessToken, int limit) {
         try {

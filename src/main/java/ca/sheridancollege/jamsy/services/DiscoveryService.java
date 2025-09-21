@@ -259,6 +259,4 @@ public class DiscoveryService {
 
         return frontendTracks;
     }
-
-
 }
