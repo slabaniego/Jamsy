@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Select Artists</title>
+    <style>
+        /* Your existing CSS styles here */
+        .artist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; margin: 20px 0; }
+        .artist-item { text-align: center; cursor: pointer; }
+        .artist-image { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #ddd; transition: all 0.3s ease; }
+        .artist-item.selected .artist-image { border-color: #4CAF50; border-width: 4px; transform: scale(1.05); box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3); }
+        .artist-checkbox { display: none; }
+        .artist-name { margin-top: 8px; font-size: 12px; color: #666; }
+        .selected-count { margin: 15px 0; font-weight: bold; font-size: 18px; background-color: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center; }
+        .submit-btn { background-color: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 20px; transition: all 0.3s ease; }
+        .submit-btn:hover:enabled { background-color: #45a049; transform: translateY(-2px); }
+        .submit-btn:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .workout-header { color: #2c5aa0; margin-bottom: 5px; font-size: 24px; font-weight: bold; }
+        .mood-header { color: #666; font-style: italic; margin-bottom: 20px; font-size: 18px; }
+        .instruction { background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-size: 16px; }
+        .max-selection { color: #ff4444; font-size: 14px; margin-top: 5px; display: none; }
+        .error { color: #f44336; text-align: center; margin: 10px 0; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+	<div th:if="${error}" style="color: red; font-weight: bold; text-align: center; margin: 10px 0;">
+    	<span th:text="${error}"></span>
+	</div>
+    <h1>Build Your Perfect <span th:text="${workout}"></span> Playlist</h1>
+    
+    <div class="instruction">
+        <strong>Which artists define your </strong>
+        <span th:text="${#strings.toLowerCase(workout)}"></span>
+        <strong> session the best?</strong>
+        <br>Select exactly 5 artists that match your <span th:text="${mood}"></span> vibe!
+    </div>
+
+    <div th:if="${error}" class="error" th:text="${error}"></div>
+
+    <div class="selected-count">
+        Selected: <span id="selectedCount">0</span> / 5 artists
+        <div id="maxSelection" class="max-selection">Maximum 5 artists selected!</div>
+    </div>
+
+    <form action="/select-artists/submit" method="post" id="discoveryForm">
+    <input type="hidden" name="workout" th:value="${workout}" />
+    <input type="hidden" name="mood" th:value="${mood}" />
+    <input type="hidden" name="artistNames" id="artistNamesInput" />
+    <input type="hidden" name="action" id="actionInput" />
+    
+    <div class="artist-grid">
+        <div th:each="artist : ${artists}" class="artist-item" th:id="'artist-item-' + ${artist.id}">
+            <input type="checkbox" class="artist-checkbox" 
+                   name="selectedArtists" th:value="${artist.id}" 
+                   th:data-name="${artist.name}"
+                   th:id="'artist-' + ${artist.id}" />
+            <label th:attr="for='artist-' + ${artist.id}" style="cursor: pointer;">
+                <img th:src="${artist.imageUrl}" 
+                     class="artist-image"
+                     th:alt="${artist.name}" />
+                <div class="artist-name" th:text="${artist.name}"></div>
+            </label>
+        </div>
+    </div>
+
+    <div style="text-align: center;">
+        <button type="button" onclick="submitForm('discover')" class="submit-btn" id="discoverBtn" disabled>
+            Start Discovering New Artists
+        </button>
+        <button type="button" onclick="submitForm('familiar')" class="submit-btn" id="familiarBtn" disabled>
+            Create a Familiar Playlist Today
+        </button>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.artist-checkbox');
+    const discoverBtn = document.getElementById('discoverBtn');
+    const familiarBtn = document.getElementById('familiarBtn');
+    const selectedCountElement = document.getElementById('selectedCount');
+    const maxSelection = 5;
+    
+    function updateSelection() {
+        const selectedCount = document.querySelectorAll('.artist-checkbox:checked').length;
+        selectedCountElement.textContent = selectedCount;
+        
+        // Enable/disable buttons
+        const buttonsEnabled = selectedCount === maxSelection;
+        discoverBtn.disabled = !buttonsEnabled;
+        familiarBtn.disabled = !buttonsEnabled;
+        
+        // Update visual selection
+        checkboxes.forEach(checkbox => {
+            const artistItem = checkbox.closest('.artist-item');
+            if (checkbox.checked) {
+                artistItem.classList.add('selected');
+            } else {
+                artistItem.classList.remove('selected');
+            }
+        });
+    }
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const selectedCount = document.querySelectorAll('.artist-checkbox:checked').length;
+            if (selectedCount > maxSelection) {
+                this.checked = false;
+                alert('Maximum 5 artists selected!');
+            }
+            updateSelection();
+        });
+    });
+    
+    updateSelection();
+});
+
+function submitForm(action) {
+    const form = document.getElementById('discoveryForm');
+    const artistNamesInput = document.getElementById('artistNamesInput');
+    const actionInput = document.getElementById('actionInput');
+    
+    // Get selected artist names and IDs
+    const selectedNames = [];
+    const selectedIds = [];
+    
+    document.querySelectorAll('.artist-checkbox:checked').forEach(checkbox => {
+        selectedNames.push(checkbox.dataset.name);
+        selectedIds.push(checkbox.value);
+    });
+    
+    console.log("Selected Artist IDs:", selectedIds);
+    console.log("Selected Artist Names:", selectedNames);
+    console.log("Workout:", form.querySelector('[name="workout"]').value);
+    console.log("Mood:", form.querySelector('[name="mood"]').value);
+    console.log("Action:", action);
+    
+    // Set the hidden inputs
+    artistNamesInput.value = JSON.stringify(selectedNames);
+    actionInput.value = action;
+    
+    // Submit the form
+    form.submit();
+}
+</script>
+
+
+</body>
+</html>
