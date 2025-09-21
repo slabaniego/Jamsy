@@ -31,10 +31,11 @@
     <div id="trackContainer" class="track-list"></div>
 
     <div class="actions">
-        <form th:action="@{/create-playlist}" method="get">
-            <button type="submit">Export to Spotify</button>
-        </form>
-    </div>
+	    <form th:action="@{/preview-playlist}" method="get">
+	        <button type="submit">Preview Playlist</button>
+	    </form>
+	</div>
+
 
     <script th:inline="javascript">
         /*<![CDATA[*/

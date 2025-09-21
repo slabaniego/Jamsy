@@ -185,4 +185,80 @@ public class DiscoveryService {
             }
         }
     }
+    
+	/* Extended playlist ( final result ) */
+    public List<Track> generateOneHourPlaylist(List<Track> likedTracks, int targetMinutes) {
+        int targetMs = targetMinutes * 60 * 1000;
+        List<Track> finalPlaylist = new ArrayList<>(likedTracks);
+
+        // Start with duration of liked tracks
+        int totalDuration = likedTracks.stream()
+                                       .mapToInt(t -> t.getDurationMs() > 0 ? t.getDurationMs() : 0)
+                                       .sum();
+
+        // Collect similar songs
+        List<Track> pool = new ArrayList<>();
+        for (Track seed : likedTracks) {
+            pool.addAll(lastFmService.getSimilarTracks(seed.getName(), seed.getArtistName(), 20));
+        }
+
+        // Deduplicate and shuffle
+        Collections.shuffle(pool);
+        Set<String> seen = new HashSet<>();
+        List<Track> uniquePool = pool.stream()
+            .filter(t -> seen.add(t.getName() + "-" + t.getArtistName()))
+            .collect(Collectors.toList());
+
+        // Add until 1 hour
+        for (Track candidate : uniquePool) {
+            if (totalDuration >= targetMs) break;
+            if (candidate.getDurationMs() > 0) {
+                finalPlaylist.add(candidate);
+                totalDuration += candidate.getDurationMs();
+            }
+        }
+
+        return finalPlaylist;
+    }
+    
+    public List<Map<String, Object>> convertTracksForFrontend(List<Track> tracks) {
+        List<Map<String, Object>> frontendTracks = new ArrayList<>();
+
+        for (Track track : tracks) {
+            Map<String, Object> frontendTrack = new HashMap<>();
+            
+            frontendTrack.put("id", track.getId() != null ? track.getId() : UUID.randomUUID().toString());
+            frontendTrack.put("name", track.getName() != null ? track.getName() : "Unknown Title");
+
+            // Artists → prefer list, fallback to single name
+            if (track.getArtists() != null && !track.getArtists().isEmpty()) {
+                frontendTrack.put("artists", track.getArtists());
+            } else if (track.getArtistName() != null && !track.getArtistName().isEmpty()) {
+                frontendTrack.put("artists", Collections.singletonList(track.getArtistName()));
+            } else {
+                frontendTrack.put("artists", Collections.singletonList("Unknown Artist"));
+            }
+
+            // Album cover
+            frontendTrack.put("albumCover", 
+                (track.getImageUrl() != null && !track.getImageUrl().isEmpty())
+                    ? track.getImageUrl()
+                    : "/images/default-cover.jpg");
+
+            // Preview (if set)
+            frontendTrack.put("previewUrl", track.getPreviewUrl());
+
+            // Genres
+            frontendTrack.put("genres", track.getGenres() != null ? track.getGenres() : Collections.emptyList());
+
+            // Duration (ms)
+            frontendTrack.put("durationMs", track.getDurationMs());
+
+            frontendTracks.add(frontendTrack);
+        }
+
+        return frontendTracks;
+    }
+
+
 }

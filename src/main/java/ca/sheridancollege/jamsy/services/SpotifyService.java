@@ -951,22 +951,64 @@ public class SpotifyService {
      }
      return null;
  }
+ 
+ // Overload method
+ public String createPlaylist(String accessToken, String playlistName, List<Track> tracks) {
+	    // Step 1: Create empty playlist
+	    String playlistId = createPlaylist(accessToken, playlistName);
+
+	    // Step 2: Convert tracks to URIs (with ID lookup if missing)
+	    List<String> trackUris = tracks.stream()
+	        .map(track -> {
+	            if (track.getId() == null || track.getId().isBlank()) {
+	                // fallback: try to search ID by name + first artist
+	                String artist = (track.getArtists() != null && !track.getArtists().isEmpty())
+	                        ? track.getArtists().get(0) : "";
+	                String id = searchTrackId(track.getName(), artist, accessToken);
+	                track.setId(id);
+	            }
+	            return track.getId() != null ? "spotify:track:" + track.getId() : null;
+	        })
+	        .filter(Objects::nonNull)
+	        .toList();
+
+	    // Step 3: Add tracks
+	    if (!trackUris.isEmpty()) {
+	        addTracksToPlaylist(accessToken, playlistId, trackUris);
+	    } else {
+	        System.out.println("⚠️ No valid track URIs to add to playlist!");
+	    }
+
+	    // Return Spotify web link
+	    return "https://open.spotify.com/playlist/" + playlistId;
+	}
 
  public void addTracksToPlaylist(String accessToken, String playlistId, List<String> trackUris) {
-     if (trackUris == null || trackUris.isEmpty()) return;
-     try {
-         String url = SPOTIFY_API_URL + "/playlists/" + playlistId + "/tracks";
-         HttpHeaders headers = new HttpHeaders();
-         headers.set("Authorization", "Bearer " + accessToken);
-         headers.setContentType(MediaType.APPLICATION_JSON);
-         Map<String,Object> body = new HashMap<>();
-         body.put("uris", trackUris);
-         HttpEntity<Map<String,Object>> entity = new HttpEntity<>(body, headers);
-         restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-     } catch (Exception e) {
-         System.out.println("❌ Error addTracksToPlaylist: " + e.getMessage());
-     }
- }
+	    if (trackUris == null || trackUris.isEmpty()) return;
+
+	    int batchSize = 100;
+	    for (int i = 0; i < trackUris.size(); i += batchSize) {
+	        List<String> batch = trackUris.subList(i, Math.min(i + batchSize, trackUris.size()));
+
+	        try {
+	            String url = SPOTIFY_API_URL + "/playlists/" + playlistId + "/tracks";
+	            HttpHeaders headers = new HttpHeaders();
+	            headers.set("Authorization", "Bearer " + accessToken);
+	            headers.setContentType(MediaType.APPLICATION_JSON);
+
+	            Map<String,Object> body = new HashMap<>();
+	            body.put("uris", batch);
+
+	            HttpEntity<Map<String,Object>> entity = new HttpEntity<>(body, headers);
+	            restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+
+	            System.out.println("✅ Added " + batch.size() + " tracks to playlist " + playlistId);
+	        } catch (Exception e) {
+	            System.out.println("❌ Error adding tracks: " + e.getMessage());
+	        }
+	    }
+	}
+
 
  // --- helper: map raw Spotify track map -> your Track bean (used earlier) ---
  private ca.sheridancollege.jamsy.beans.Track mapSpotifyTrack(Map<String, Object> t) {
@@ -1191,18 +1233,24 @@ return trackIds;
     }
     */
     
+    private String cleanTrackName(String raw) {
+        return raw.replaceAll("\\(.*?\\)", "")  // remove (feat. SZA), (Remaster), etc.
+                  .replaceAll("-.*", "")        // remove " - Journey" if you’re already passing artist separately
+                  .trim();
+    }
+    
     /**
      * Search Spotify for a track ID by track name and artist name.
      * If ID is missing, this can be used to populate it.
      */
     public String searchTrackId(String trackName, String artistName, String accessToken) {
-        if (trackName == null || artistName == null || trackName.isBlank() || artistName.isBlank()) {
-            System.out.println("⚠️ searchTrackId called with invalid params: " + trackName + " / " + artistName);
+        if (cleanTrackName(trackName) == null || artistName == null || cleanTrackName(trackName).isBlank() || artistName.isBlank()) {
+            System.out.println("⚠️ searchTrackId called with invalid params: " + cleanTrackName(trackName) + " / " + artistName);
             return null;
         }
 
         try {
-            String query = "track:" + URLEncoder.encode(trackName, StandardCharsets.UTF_8) +
+            String query = "track:" + URLEncoder.encode(cleanTrackName(trackName), StandardCharsets.UTF_8) +
                            " artist:" + URLEncoder.encode(artistName, StandardCharsets.UTF_8);
 
             String url = SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=1";
@@ -1222,14 +1270,14 @@ return trackIds;
                     Map<String, Object> trackData = items.get(0);
                     String spotifyId = (String) trackData.get("id");
 
-                    System.out.println("✅ Found Spotify ID for " + trackName + " - " + artistName + ": " + spotifyId);
+                    System.out.println("✅ Found Spotify ID for " + cleanTrackName(trackName) + " - " + artistName + ": " + spotifyId);
                     return spotifyId;
                 } else {
-                    System.out.println("❌ No matching track found on Spotify for: " + trackName + " - " + artistName);
+                    System.out.println("❌ No matching track found on Spotify for: " + cleanTrackName(trackName) + " - " + artistName);
                 }
             }
         } catch (Exception e) {
-            System.out.println("❌ Error searching track ID for " + trackName + " - " + artistName + ": " + e.getMessage());
+            System.out.println("❌ Error searching track ID for " + cleanTrackName(trackName) + " - " + artistName + ": " + e.getMessage());
         }
 
         return null;
@@ -1566,9 +1614,8 @@ return trackIds;
 
         // Shuffle and limit
         Collections.shuffle(tracks);
-        return tracks.stream().limit(20).collect(Collectors.toList());
+        return tracks.stream().limit(10).collect(Collectors.toList());
     }
-    
     
     
     /**
@@ -1646,6 +1693,4 @@ return trackIds;
             return Collections.emptyList();
         }
     }
-
-
 }
