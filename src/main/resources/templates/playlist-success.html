@@ -1,6 +1,73 @@
+<nav style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); padding: 12px 20px; border-radius: 12px; margin-bottom: 20px; text-align:center;">
+    <a href="/" style="color:white; text-decoration:none; font-weight:600; font-size:16px;">🏠 Home</a>
+</nav>
+
+
 <h1>✅ Playlist Created!</h1>
-<p>
-    Your playlist has been exported to Spotify.  
-    <a th:href="${playlistUrl}" target="_blank">Open in Spotify</a>
-</p>
-<p><a th:href="@{/liked}">Back to Liked Songs</a></p>
+
+<div class="message-container">
+    <p>
+        Your playlist has been exported to Spotify.  
+        <a th:href="${playlistUrl}" target="_blank" class="spotify-link">Open in Spotify</a>
+    </p>
+    <p>
+        <a th:href="@{/liked}" class="back-link">← Back to Liked Songs</a>
+    </p>
+</div>
+
+<style>
+body {
+    font-family: 'Poppins', sans-serif;
+    background: radial-gradient(circle at 20% 30%, #1e003e, #0f001f, #000000);
+    color: white;
+    text-align: center;
+    padding: 40px 20px;
+    margin: 0;
+}
+
+h1 {
+    font-size: 32px;
+    font-weight: 600;
+    margin-bottom: 25px;
+    text-shadow: 0 0 10px rgba(255,255,255,0.3);
+}
+
+.message-container {
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(12px);
+    padding: 30px;
+    border-radius: 16px;
+    display: inline-block;
+    max-width: 500px;
+}
+
+.message-container p {
+    font-size: 18px;
+    margin: 15px 0;
+}
+
+.spotify-link, .back-link {
+    color: #4CAF50;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.spotify-link:hover, .back-link:hover {
+    color: #81c784;
+    text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 26px;
+    }
+    .message-container {
+        width: 90%;
+        padding: 20px;
+    }
+    .message-container p {
+        font-size: 16px;
+    }
+}
+</style>

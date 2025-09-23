@@ -1,321 +1,294 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Discover Underrated Tracks</title>
-    <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-        }
+  <title>Discover Tracks</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 30%, #1e003e, #0f001f, #000000);
+      overflow: hidden;
+      color: white;
+    }
 
-        .container {
-            max-width: 500px;
-            margin: 0 auto;
-        }
+    .container {
+      max-width: 420px;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+      position: relative;
+    }
 
-        h1 {
-            color: white;
-            margin-bottom: 30px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
+    h1 {
+      color: #fff;
+      margin-bottom: 20px;
+      font-size: 26px;
+      font-weight: 600;
+      text-shadow: 0 0 10px rgba(255,255,255,0.3);
+    }
 
-        #trackCard {
-            background: white;
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 20px;
-        }
+    .workout-badge {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      display: inline-block;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
 
-        #albumCover {
-            width: 250px;
-            height: 250px;
-            border-radius: 12px;
-            object-fit: cover;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
+    #trackContainer {
+      position: relative;
+      height: 440px;
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-        #trackName {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 15px 0 5px;
-            color: #333;
-        }
+    .swipe-card {
+      position: absolute;
+      width: 100%;
+      max-width: 360px;
+      height: 100%;
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      transition: transform 0.4s ease, opacity 0.4s ease;
+    }
 
-        #artistName {
-            font-size: 18px;
-            color: #666;
-            margin-bottom: 10px;
-        }
+    .swipe-card img {
+      width: 100%;
+      height: 260px;
+      border-radius: 16px;
+      object-fit: cover;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+      margin-bottom: 15px;
+    }
 
-        #genreText {
-            font-size: 14px;
-            color: #888;
-            font-style: italic;
-            margin-bottom: 20px;
-        }
+    #trackName { font-size: 20px; font-weight: 600; margin: 5px 0; }
+    #artistName { font-size: 15px; color: #ddd; margin-bottom: 5px; }
+    #genreText { font-size: 13px; color: #bbb; font-style: italic; margin-bottom: 15px; }
 
-        audio {
-            width: 100%;
-            margin: 20px 0;
-            border-radius: 25px;
-        }
+    audio {
+      width: 100%;
+      margin-top: auto;
+      border-radius: 8px;
+    }
 
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin: 20px 0;
-        }
+    /* Simple music bars animation */
+    .music-anim {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      margin-top: 10px;
+      gap: 4px;
+      height: 20px;
+    }
+    .music-anim div {
+      width: 4px;
+      background: #4CAF50;
+      animation: bounce 0.6s infinite alternate;
+    }
+    .music-anim div:nth-child(2) { animation-delay: 0.1s; }
+    .music-anim div:nth-child(3) { animation-delay: 0.2s; }
+    .music-anim div:nth-child(4) { animation-delay: 0.3s; }
+    .music-anim div:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0% { height: 4px; }
+      100% { height: 20px; }
+    }
 
-        button {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
+    .swipe-badge {
+      position: absolute;
+      top: 30px;
+      font-size: 32px;
+      font-weight: bold;
+      padding: 10px 20px;
+      border: 3px solid;
+      border-radius: 8px;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      text-shadow: 0 0 10px rgba(0,0,0,0.4);
+    }
 
-        button.like {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            color: white;
-        }
+    .badge-like { left: 20px; border-color: #4CAF50; color: #4CAF50; background: rgba(76,175,80,0.1); transform: rotate(-15deg);}
+    .badge-skip { right: 20px; border-color: #ff5252; color: #ff5252; background: rgba(255,82,82,0.1); transform: rotate(15deg);}
+    .show-badge { opacity: 1; }
 
-        button.skip {
-            background: linear-gradient(135deg, #f44336, #da190b);
-            color: white;
-        }
+    .action-section { display: flex; flex-direction: column; align-items: center; }
+    .action-buttons { display: flex; justify-content: center; gap: 40px; margin-bottom: 15px; }
+    .round-btn {
+      width: 70px; height: 70px; border-radius: 50%; border: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: white; cursor: pointer;
+      transition: transform 0.2s ease; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+    .round-btn.skip { background: radial-gradient(circle at top, #ff4d4d, #b30000); }
+    .round-btn.like { background: radial-gradient(circle at top, #4CAF50, #2d7d32); }
+    .round-btn:hover { transform: scale(1.1); }
 
-        button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-        }
+    .song-counter { font-size: 15px; color: #fff; opacity: 0.8; }
+    .submit-btn {
+      padding: 14px 30px; background: linear-gradient(135deg, #2196F3, #0b7dda);
+      color: white; border: none; border-radius: 30px; font-size: 16px;
+      font-weight: 600; cursor: pointer; margin-top: 15px; transition: all 0.3s;
+      box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+    }
+    .submit-btn:disabled { background: #555; cursor: not-allowed; }
+    .submit-btn:not(:disabled):hover { transform: translateY(-3px); }
+    .swipe-left { transform: translateX(-150%) rotate(-20deg); opacity: 0; }
+    .swipe-right { transform: translateX(150%) rotate(20deg); opacity: 0; }
+    .incoming-card { transform: translateX(150%); opacity: 0; z-index: 1; }
+    .incoming-card.active { transform: translateX(0); opacity: 1; transition: transform 0.4s ease, opacity 0.4s ease; }
 
-        button:active {
-            transform: translateY(-1px);
-        }
-
-        .song-counter {
-            font-size: 16px;
-            color: #555;
-            margin: 15px 0;
-            font-weight: 500;
-        }
-
-        .submit-btn {
-            padding: 15px 40px;
-            background: linear-gradient(135deg, #2196F3, #0b7dda);
-            color: white;
-            border: none;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 20px;
-            transition: all 0.3s;
-            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
-        }
-
-        .submit-btn:disabled {
-            background: #cccccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .submit-btn:not(:disabled):hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(33, 150, 243, 0.6);
-        }
-
-        .workout-badge {
-            background: rgba(76, 175, 80, 0.9);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-            display: inline-block;
-            margin-bottom: 20px;
-        }
-    </style>
+    @media (max-width:480px) {
+      .container { max-width: 95%; }
+      #trackContainer { height: 380px; }
+      .round-btn { width: 60px; height: 60px; font-size: 24px; }
+    }
+  </style>
 </head>
 <body>
-
 <div class="container">
-    <h1>🎵 Discover Underrated <span th:text="${workout}"></span> Tracks</h1>
-    
-    <div th:if="${isFamiliar}" class="workout-badge">
+  <h1>🎵 Discover <span th:text="${workout}"></span> Tracks</h1>
+
+  <div th:if="${isFamiliar}" class="workout-badge">
     Familiar Playlist • Based on your selected artists' popular tracks
-</div>
-<div th:unless="${isFamiliar}" class="workout-badge">
+  </div>
+  <div th:unless="${isFamiliar}" class="workout-badge">
     Based on your selected artists • Finding hidden gems
-</div>
+  </div>
 
-    <div id="trackContainer">
-        <div id="trackCard">
-            <img id="albumCover" src="" alt="Album Cover" />
-            <h2 id="trackName"></h2>
-            <p id="artistName"></p>
-            <p id="genreText"></p>
-            <audio id="previewPlayer" controls></audio>
-
-            <div class="action-buttons">
-                <button class="like" onclick="handleAction('like')">❤️ Like</button>
-                <button class="skip" onclick="handleAction('skip')">⏭️ Skip</button>
-            </div>
-            
-            <div class="song-counter">
-                Discovering song <span id="currentSongNumber">1</span> of <span id="totalSongs">20</span>
-            </div>
-            
-            <button id="submitBtn" class="submit-btn" onclick="submitActions()" disabled>
-			    👀 View Generated Playlist
-			</button>
-        </div>
+  <div id="trackContainer">
+    <div id="trackCard" class="swipe-card">
+      <img id="albumCover" src="" alt="Album Cover" />
+      <h2 id="trackName"></h2>
+      <p id="artistName"></p>
+      <p id="genreText"></p>
+      <audio id="previewPlayer" controls></audio>
+      <div class="music-anim">
+        <div></div><div></div><div></div><div></div><div></div>
+      </div>
+      <div id="likeBadge" class="swipe-badge badge-like">YAYYY</div>
+      <div id="skipBadge" class="swipe-badge badge-skip">NOPES</div>
     </div>
+  </div>
+
+  <div class="action-section">
+    <div class="action-buttons">
+      <button class="round-btn skip" onclick="manualSwipe('skip')">❌</button>
+      <button class="round-btn like" onclick="manualSwipe('like')">❤️</button>
+    </div>
+    <div class="song-counter">
+      Discovering song <span id="currentSongNumber">1</span> of <span id="totalSongs">20</span>
+    </div>
+    <button id="submitBtn" class="submit-btn" onclick="submitActions()" disabled>
+      👀 View Generated Playlist
+    </button>
+  </div>
 </div>
 
 <script th:inline="javascript">
 /*<![CDATA[*/
 let currentIndex = 0;
 let likedTracks = [];
-// tracksJson is injected by Thymeleaf in your template (you already used this)
 let tracks = JSON.parse(/*[[${tracksJson}]]*/ '[]');
 
-function displayCurrentTrack() {
-    if (!tracks || tracks.length === 0) {
-        document.getElementById('trackName').textContent = "No tracks found";
-        document.getElementById('artistName').textContent = "";
-        document.getElementById('albumCover').src = "/images/default-cover.jpg";
-        document.getElementById('previewPlayer').style.display = 'none';
-        document.getElementById('submitBtn').disabled = true;
-        return;
-    }
-
-    if (currentIndex >= tracks.length) {
-        endOfTracks();
-        return;
-    }
-
-    const track = tracks[currentIndex];
-    document.getElementById("trackName").textContent = track.name || "Unknown Track";
-    document.getElementById("artistName").textContent = (track.artists || []).join(", ") || "Unknown Artist";
-    document.getElementById("albumCover").src = track.albumCover || "/images/default-cover.jpg";
-    document.getElementById("currentSongNumber").textContent = currentIndex + 1;
-    document.getElementById("totalSongs").textContent = tracks.length;
-
-    const audioPlayer = document.getElementById("previewPlayer");
-    if (track.previewUrl) {
-        audioPlayer.src = track.previewUrl;
-        audioPlayer.style.display = 'block';
-    } else {
-        audioPlayer.pause();
-        audioPlayer.style.display = 'none';
-    }
-}
-
-// central action handler for Like / Skip
-function handleAction(action) {
-    if (!tracks || currentIndex >= tracks.length) return;
-    const track = tracks[currentIndex];
-
-    // build request payload that matches your controller expectations
-    const payload = {
-        action: action,
-        trackId: track.id,
-        songName: track.name,
-        artist: (track.artists && track.artists[0]) ? track.artists[0] : "Unknown",
-        genres: track.genres || CollectionsEmptyArray() // optional
-    };
-
-    fetch('/handle-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-        // your controller returns { success: true, message: "..."}
-        if (data && data.success) {
-            if (action === 'like') {
-                likedTracks.push(track);
-            }
-            // move to next track on success
-            currentIndex++;
-            if (currentIndex < tracks.length) {
-                displayCurrentTrack();
-            } else {
-                endOfTracks();
-            }
-        } else {
-            console.warn("Server replied but reported failure", data);
-            // still advance to avoid infinite loop
-            currentIndex++;
-            if (currentIndex < tracks.length) displayCurrentTrack();
-            else endOfTracks();
-        }
-    })
-    .catch(err => {
-        console.error("Error calling /handle-action:", err);
-        currentIndex++;
-        if (currentIndex < tracks.length) displayCurrentTrack();
-        else endOfTracks();
-    });
-}
-
-function endOfTracks() {
-    // enable create playlist button (user can review likedTracks server-side)
-    document.getElementById('submitBtn').disabled = false;
-    // Optionally automatically redirect to create playlist:
-    // window.location.href = '/create-playlist';
-}
-
-function submitActions() {
-    // Instead of creating playlist right away, show preview
-    window.location.href = '/preview-playlist';
-}
-
-// helper to avoid NPE when template doesn't provide genres
-function CollectionsEmptyArray(){ return []; }
-
-// init
-window.addEventListener('load', () => {
-    displayCurrentTrack();
-});
-
-// keep your touch-swiping logic but call handleAction (rename inside)
-let startX, startY;
 const card = document.getElementById('trackCard');
-if (card) {
-    card.addEventListener('touchstart', e => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    });
+const likeBadge = document.getElementById('likeBadge');
+const skipBadge = document.getElementById('skipBadge');
 
-    card.addEventListener('touchend', e => {
-        const endX = e.changedTouches[0].clientX;
-        const endY = e.changedTouches[0].clientY;
-        const diffX = endX - startX;
-        const diffY = endY - startY;
-        if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
-            if (diffX > 0) handleAction('like'); // swipe right = like
-            else handleAction('skip'); // swipe left = skip
-        }
-    });
+function displayCurrentTrack() {
+  if (!tracks || tracks.length === 0) {
+    document.getElementById('trackName').textContent = "No tracks found";
+    document.getElementById('artistName').textContent = "";
+    document.getElementById('albumCover').src = "/images/default-cover.jpg";
+    document.getElementById('previewPlayer').style.display = 'none';
+    document.getElementById('submitBtn').disabled = true;
+    return;
+  }
+  if (currentIndex >= tracks.length) { endOfTracks(); return; }
+
+  const track = tracks[currentIndex];
+  document.getElementById("trackName").textContent = track.name || "Unknown Track";
+  document.getElementById("artistName").textContent = (track.artists || []).join(", ") || "Unknown Artist";
+  document.getElementById("albumCover").src = track.albumCover || "/images/default-cover.jpg";
+  document.getElementById("currentSongNumber").textContent = currentIndex + 1;
+  document.getElementById("totalSongs").textContent = tracks.length;
+
+  const audioPlayer = document.getElementById("previewPlayer");
+  if (track.previewUrl) { audioPlayer.src = track.previewUrl; audioPlayer.style.display='block'; }
+  else { audioPlayer.pause(); audioPlayer.style.display='none'; }
+
+  card.style.transform = "translateX(0) rotate(0)";
+  card.style.opacity = "1";
 }
+
+function showBadge(type) {
+  if (type==='like'){ likeBadge.classList.add('show-badge'); setTimeout(()=>likeBadge.classList.remove('show-badge'),800);}
+  else { skipBadge.classList.add('show-badge'); setTimeout(()=>skipBadge.classList.remove('show-badge'),800);}
+}
+
+function handleAction(action){
+  if(!tracks || currentIndex >= tracks.length) return;
+  const track = tracks[currentIndex];
+
+  const payload = { action: action, trackId: track.id, songName: track.name,
+    artist: (track.artists && track.artists[0]) ? track.artists[0] : "Unknown", genres: track.genres||[]};
+
+  fetch('/handle-action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+  .then(res=>res.json())
+  .then(data=>{
+      if(data.success && action==='like') likedTracks.push(track);
+
+      currentIndex++;
+      if(currentIndex < tracks.length) animateNextCard();
+      else endOfTracks();
+  })
+  .catch(()=>{ currentIndex++; if(currentIndex < tracks.length) animateNextCard(); else endOfTracks(); });
+}
+
+function animateNextCard(){
+  card.classList.add('incoming-card');
+  setTimeout(()=>{
+    displayCurrentTrack();
+    card.classList.add('active');
+    setTimeout(()=>card.classList.remove('incoming-card','active'),400);
+  },50);
+}
+
+function endOfTracks(){ document.getElementById('submitBtn').disabled=false; }
+
+function submitActions(){ window.location.href='/preview-playlist'; }
+
+function manualSwipe(action){
+  showBadge(action);
+  card.classList.add(action==='like'?'swipe-right':'swipe-left');
+  setTimeout(()=>{ card.classList.remove('swipe-right','swipe-left'); handleAction(action); },300);
+}
+
+let startX=0; card.addEventListener('touchstart',e=>{ startX=e.touches[0].clientX; });
+card.addEventListener('touchend',e=>{ const diffX=e.changedTouches[0].clientX-startX; if(Math.abs(diffX)>50){ manualSwipe(diffX>0?'like':'skip'); } });
+
+window.addEventListener('load', displayCurrentTrack);
 /*]]>*/
 </script>
-
-
 </body>
 </html>

@@ -1,3 +1,4 @@
+
 package ca.sheridancollege.jamsy.beans;
 
 import lombok.AllArgsConstructor;

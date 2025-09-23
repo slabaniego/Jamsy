@@ -4,26 +4,123 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Workout Playlists</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #1e003e 0%, #0f001f 100%);
+            --text-main: #ffffff;
+            --text-muted: #bbb;
+            --font-main: 'Poppins', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            position: relative;
+            width: 90%;
+            max-width: 500px;
+            height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        h1 {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 26px;
+            font-weight: 600;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
+        }
+
+        .option {
+            position: absolute;
+            width: 140px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 20px;
+            text-decoration: none;
+            color: var(--text-main);
+            font-weight: 500;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+        }
+
+        .option:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 30px rgba(255,255,255,0.2);
+        }
+
+        /* Individual Gradients */
+        .top { 
+            top: 0; left: 50%; transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #ff7e5f, #feb47b);
+        }
+        .bottom { 
+            bottom: 0; left: 50%; transform: translate(-50%, 50%);
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+        }
+        .left { 
+            top: 50%; left: 0; transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #43cea2, #185a9d);
+        }
+        .right { 
+            top: 50%; right: 0; transform: translate(50%, -50%);
+            background: linear-gradient(135deg, #ff6a00, #ee0979);
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #fff;
+            text-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                height: 400px;
+            }
+            .option {
+                width: 110px;
+                height: 70px;
+            }
+            h1 {
+                font-size: 22px;
+            }
+            h3 {
+                font-size: 16px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Choose Your Workout</h1>
+    <div class="container">
+        <h1>Choose Your Workout</h1>
 
-    <div>
-        <a href="/more-artists?workout=Cardio&mood=Energetic">
-            <h3>Cardio</h3>
-        </a>
-
-        <a href="/more-artists?workout=Strength Training&mood=Powerful">
-            <h3>Strength Training</h3>
-        </a>
-
-        <a href="/more-artists?workout=HIIT&mood=Intense">
-            <h3>HIIT</h3>
-        </a>
-
-        <a href="/more-artists?workout=Yoga&mood=Calm">
-            <h3>Yoga</h3>
-        </a>
+        <a href="/more-artists?workout=Cardio&mood=Energetic" class="option top"><h3>Cardio</h3></a>
+        <a href="/more-artists?workout=Strength Training&mood=Powerful" class="option bottom"><h3>Strength Training</h3></a>
+        <a href="/more-artists?workout=HIIT&mood=Intense" class="option left"><h3>HIIT</h3></a>
+        <a href="/more-artists?workout=Yoga&mood=Calm" class="option right"><h3>Yoga</h3></a>
     </div>
 </body>
 </html>

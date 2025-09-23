@@ -1,34 +1,135 @@
 <h1>🎶 Preview Your Playlist</h1>
 <div id="trackContainer" class="track-list"></div>
 
-<div class="actions">
+<div class="actions" style="text-align:center; margin-top: 20px;">
     <form th:action="@{/create-playlist}" method="get">
-        <button type="submit">Confirm & Export to Spotify</button>
+        <button type="submit" class="submit-btn">Confirm & Export to Spotify</button>
     </form>
 </div>
 
-<script th:inline="javascript">
-	/*<![CDATA[*/
-	const tracks = [[${tracksJson}]];
-	console.log("Preview tracks:", tracks);
-	/*]]>*/
+<style>
+body {
+    font-family: 'Poppins', sans-serif;
+    background: radial-gradient(circle at 20% 30%, #1e003e, #0f001f, #000000);
+    color: white;
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+}
 
-    const container = document.getElementById("trackContainer");
-    if (tracks.length === 0) {
-        container.innerHTML = "<p>No playlist generated yet.</p>";
-    } else {
-        tracks.forEach(track => {
-            const card = document.createElement("div");
-            card.className = "track-card";
+h1 {
+    font-size: 28px;
+    font-weight: 600;
+    text-shadow: 0 0 10px rgba(255,255,255,0.3);
+    margin-bottom: 30px;
+}
 
-            card.innerHTML = `
-                <img src="${track.albumCover || 'https://via.placeholder.com/200'}" />
-                <div class="track-name">${track.name}</div>
-                <div class="track-artist">${track.artists?.join(", ") || "Unknown Artist"}</div>
-                ${track.previewUrl ? `<audio controls src="${track.previewUrl}"></audio>` : ""}
-            `;
+.track-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
 
-            container.appendChild(card);
-        });
+.track-card {
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    padding: 15px;
+    width: 220px;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.track-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+}
+
+.track-card img {
+    width: 100%;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+}
+
+.track-name {
+    font-weight: 600;
+    font-size: 18px;
+    margin-bottom: 5px;
+}
+
+.track-artist {
+    font-size: 14px;
+    color: #ddd;
+    margin-bottom: 10px;
+    font-style: italic;
+}
+
+audio {
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 8px;
+}
+
+/* Submit Button */
+.submit-btn {
+    padding: 14px 30px;
+    background: linear-gradient(135deg, #2196F3, #0b7dda);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: all 0.3s;
+    box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+}
+
+.submit-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(33, 150, 243, 0.6);
+}
+
+.submit-btn:disabled {
+    background: #555;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+@media (max-width: 480px) {
+    .track-card {
+        width: 90%;
     }
+}
+</style>
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+const tracks = [[${tracksJson}]];
+console.log("Preview tracks:", tracks);
+
+const container = document.getElementById("trackContainer");
+
+if (!tracks || tracks.length === 0) {
+    container.innerHTML = "<p>No playlist generated yet.</p>";
+} else {
+    tracks.forEach(track => {
+        const card = document.createElement("div");
+        card.className = "track-card";
+
+        card.innerHTML = `
+            <img src="${track.albumCover || 'https://via.placeholder.com/200'}" />
+            <div class="track-name">${track.name}</div>
+            <div class="track-artist">${track.artists?.join(", ") || "Unknown Artist"}</div>
+            ${track.previewUrl ? `<audio controls src="${track.previewUrl}"></audio>` : ""}
+        `;
+
+        container.appendChild(card);
+    });
+}
+/*]]>*/
 </script>

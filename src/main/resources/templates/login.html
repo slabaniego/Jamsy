@@ -1,12 +1,101 @@
-
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Spotify Playlist Generator - Login</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #1e003e 0%, #0f001f 100%);
+            --primary-gradient: linear-gradient(135deg, #4CAF50, #2d7d32);
+            --accent-blue: #2196F3;
+            --text-main: #ffffff;
+            --text-muted: #bbb;
+            --font-main: 'Poppins', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 24px;
+            padding: 40px 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
+        }
+
+        p {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 14px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: var(--accent-blue);
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(33,150,243,0.4);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(33,150,243,0.6);
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            p {
+                font-size: 14px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Welcome to Spotify Playlist Generator</h1>
-    <p>Please log in with your Spotify account to continue.</p>
-    <a href="/oauth2/authorization/spotify">Connect Spotify</a>
+    <div class="container">
+        <h1>Welcome to Spotify Playlist Generator</h1>
+        <p>Please log in with your Spotify account to continue.</p>
+        <a href="/oauth2/authorization/spotify" class="btn">Connect Spotify</a>
+    </div>
 </body>
 </html>
