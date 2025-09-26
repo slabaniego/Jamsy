@@ -56,6 +56,7 @@
       align-items: center;
     }
 
+    /* Cards */
     .swipe-card {
       position: absolute;
       width: 100%;
@@ -71,6 +72,7 @@
       align-items: center;
       padding: 20px;
       transition: transform 0.4s ease, opacity 0.4s ease;
+      touch-action: none;
     }
 
     .swipe-card img {
@@ -92,7 +94,7 @@
       border-radius: 8px;
     }
 
-    /* Simple music bars animation */
+    /* Music animation bars */
     .music-anim {
       display: flex;
       justify-content: center;
@@ -115,6 +117,7 @@
       100% { height: 20px; }
     }
 
+    /* Swipe badges */
     .swipe-badge {
       position: absolute;
       top: 30px;
@@ -132,6 +135,7 @@
     .badge-skip { right: 20px; border-color: #ff5252; color: #ff5252; background: rgba(255,82,82,0.1); transform: rotate(15deg);}
     .show-badge { opacity: 1; }
 
+    /* Buttons */
     .action-section { display: flex; flex-direction: column; align-items: center; }
     .action-buttons { display: flex; justify-content: center; gap: 40px; margin-bottom: 15px; }
     .round-btn {
@@ -153,10 +157,6 @@
     }
     .submit-btn:disabled { background: #555; cursor: not-allowed; }
     .submit-btn:not(:disabled):hover { transform: translateY(-3px); }
-    .swipe-left { transform: translateX(-150%) rotate(-20deg); opacity: 0; }
-    .swipe-right { transform: translateX(150%) rotate(20deg); opacity: 0; }
-    .incoming-card { transform: translateX(150%); opacity: 0; z-index: 1; }
-    .incoming-card.active { transform: translateX(0); opacity: 1; transition: transform 0.4s ease, opacity 0.4s ease; }
 
     @media (max-width:480px) {
       .container { max-width: 95%; }
@@ -197,7 +197,7 @@
       <button class="round-btn like" onclick="manualSwipe('like')">❤️</button>
     </div>
     <div class="song-counter">
-      Discovering song <span id="currentSongNumber">1</span> of <span id="totalSongs">20</span>
+      Discovering song <span id="currentSongNumber">1</span> of <span id="totalSongs">10</span>
     </div>
     <button id="submitBtn" class="submit-btn" onclick="submitActions()" disabled>
       👀 View Generated Playlist
@@ -224,7 +224,10 @@ function displayCurrentTrack() {
     document.getElementById('submitBtn').disabled = true;
     return;
   }
-  if (currentIndex >= tracks.length) { endOfTracks(); return; }
+  if (currentIndex >= tracks.length) { 
+    endOfTracks(); 
+    return; 
+  }
 
   const track = tracks[currentIndex];
   document.getElementById("trackName").textContent = track.name || "Unknown Track";
@@ -242,50 +245,90 @@ function displayCurrentTrack() {
 }
 
 function showBadge(type) {
-  if (type==='like'){ likeBadge.classList.add('show-badge'); setTimeout(()=>likeBadge.classList.remove('show-badge'),800);}
-  else { skipBadge.classList.add('show-badge'); setTimeout(()=>skipBadge.classList.remove('show-badge'),800);}
+  if (type==='like'){ likeBadge.classList.add('show-badge'); setTimeout(()=>likeBadge.classList.remove('show-badge'),800); }
+  else { skipBadge.classList.add('show-badge'); setTimeout(()=>skipBadge.classList.remove('show-badge'),800); }
 }
 
 function handleAction(action){
   if(!tracks || currentIndex >= tracks.length) return;
   const track = tracks[currentIndex];
 
-  const payload = { action: action, trackId: track.id, songName: track.name,
-    artist: (track.artists && track.artists[0]) ? track.artists[0] : "Unknown", genres: track.genres||[]};
+  const payload = { 
+    action: action, 
+    trackId: track.id, 
+    songName: track.name,
+    artist: (track.artists && track.artists[0]) ? track.artists[0] : "Unknown", 
+    genres: track.genres||[]
+  };
 
-  fetch('/handle-action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+  fetch('/handle-action', {
+    method:'POST', 
+    headers:{'Content-Type':'application/json'}, 
+    body:JSON.stringify(payload)
+  })
   .then(res=>res.json())
   .then(data=>{
       if(data.success && action==='like') likedTracks.push(track);
 
       currentIndex++;
-      if(currentIndex < tracks.length) animateNextCard();
-      else endOfTracks();
+      if(currentIndex < tracks.length) {
+        animateNextCard();
+      } else {
+        endOfTracks();
+      }
   })
-  .catch(()=>{ currentIndex++; if(currentIndex < tracks.length) animateNextCard(); else endOfTracks(); });
+  .catch(()=>{
+    currentIndex++;
+    if(currentIndex < tracks.length) animateNextCard(); 
+    else endOfTracks();
+  });
 }
 
 function animateNextCard(){
-  card.classList.add('incoming-card');
-  setTimeout(()=>{
+  card.style.transition = "none";
+  card.style.transform = "translateX(0) rotate(0)";
+  setTimeout(() => {
+    card.style.transition = "transform 0.4s ease, opacity 0.4s ease";
     displayCurrentTrack();
-    card.classList.add('active');
-    setTimeout(()=>card.classList.remove('incoming-card','active'),400);
-  },50);
+  }, 50);
 }
 
-function endOfTracks(){ document.getElementById('submitBtn').disabled=false; }
+function endOfTracks(){
+  document.getElementById('submitBtn').disabled = false;
+}
 
-function submitActions(){ window.location.href='/preview-playlist'; }
+function submitActions(){
+  window.location.href='/preview-playlist';
+}
 
 function manualSwipe(action){
+  if(currentIndex >= tracks.length) return; // disable swipe when no more tracks
+
   showBadge(action);
-  card.classList.add(action==='like'?'swipe-right':'swipe-left');
-  setTimeout(()=>{ card.classList.remove('swipe-right','swipe-left'); handleAction(action); },300);
+  card.style.transition = "transform 0.3s ease, opacity 0.3s ease";
+  card.style.transform = action === 'like' ? "translateX(150%) rotate(20deg)" : "translateX(-150%) rotate(-20deg)";
+  card.style.opacity = "0";
+
+  setTimeout(()=>{
+    handleAction(action);
+    card.style.opacity = "1";
+    card.style.transform = "translateX(0) rotate(0)";
+  },300);
 }
 
-let startX=0; card.addEventListener('touchstart',e=>{ startX=e.touches[0].clientX; });
-card.addEventListener('touchend',e=>{ const diffX=e.changedTouches[0].clientX-startX; if(Math.abs(diffX)>50){ manualSwipe(diffX>0?'like':'skip'); } });
+/* Swipe via touch */
+let startX = 0;
+card.addEventListener('touchstart', e => { 
+  if(currentIndex >= tracks.length) return; // disable touch swipe
+  startX = e.touches[0].clientX; 
+});
+card.addEventListener('touchend', e => { 
+  if(currentIndex >= tracks.length) return;
+  const diffX = e.changedTouches[0].clientX - startX;
+  if(Math.abs(diffX) > 50) { 
+    manualSwipe(diffX > 0 ? 'like' : 'skip'); 
+  }
+});
 
 window.addEventListener('load', displayCurrentTrack);
 /*]]>*/
