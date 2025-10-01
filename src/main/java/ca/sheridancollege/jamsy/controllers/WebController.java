@@ -110,6 +110,11 @@ public class WebController {
         return "login"; 
     }
 
+    @GetMapping("/login")
+    public String login() {
+        return "login"; 
+    }
+
     @GetMapping("/playlist-templates")
     public String showPlaylistTemplates(@RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient, 
                                       HttpSession session, Model model) {
