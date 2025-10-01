@@ -39,9 +39,11 @@ public class SecurityConfig {
                     // Mobile JSON endpoints
                     "/api/search",
                     "/api/discover",
-                    "/api/liked",
+                    "/liked",
+                    "/preview-playlist",
                     "/api/preview-playlist",
                     "/api/create-playlist",
+                    "/api/track/action",
                     // Spotify API endpoints for mobile
                     "/spotify/artists/**",
                     "/spotify/recommend/**"
