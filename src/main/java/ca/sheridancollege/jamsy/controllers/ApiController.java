@@ -1,6 +1,7 @@
 package ca.sheridancollege.jamsy.controllers;
 
 import java.util.*;
+import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,12 +57,31 @@ public class ApiController {
             // Log the action
             System.out.println("Track " + action + ": " + songName + " by " + artist);
             
+            // Save to database
+            SongAction songAction = new SongAction();
+            songAction.setIsrc(isrc);
+            songAction.setSongName(songName);
+            songAction.setArtist(artist);
+            songAction.setAction(action);
+            
+            // Parse genres from comma-separated string
+            if (genres != null && !genres.isEmpty()) {
+                songAction.setGenres(Arrays.asList(genres.split(",")));
+            } else {
+                songAction.setGenres(new ArrayList<>());
+            }
+            
+            songActionRepo.save(songAction);
+            System.out.println("✅ Saved track action to database: " + songName + " by " + artist + " (" + action + ")");
+            
             // Return success response
             response.put("status", "success");
             response.put("message", "Track " + action + " recorded successfully");
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
+            System.out.println("❌ Error saving track action: " + e.getMessage());
+            e.printStackTrace();
             response.put("status", "error");
             response.put("message", "Error processing request: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
@@ -168,7 +188,11 @@ public class ApiController {
     public ResponseEntity<Map<String, Object>> apiPreviewPlaylist() {
         Map<String, Object> response = new HashMap<>();
         try {
+            System.out.println("ApiController: ===== PREVIEW PLAYLIST API CALLED =====");
+            
             List<SongAction> likedActions = songActionRepo.findByAction("like");
+            System.out.println("ApiController: Found " + likedActions.size() + " liked actions in database");
+            
             List<Track> likedTracks = new ArrayList<>();
             for (SongAction action : likedActions) {
                 Track t = new Track();
@@ -176,11 +200,29 @@ public class ApiController {
                 t.setArtists(Collections.singletonList(action.getArtist()));
                 likedTracks.add(t);
             }
+            
+            System.out.println("ApiController: Converted to " + likedTracks.size() + " liked tracks");
+            
+            if (likedTracks.isEmpty()) {
+                System.out.println("ApiController: WARNING - No liked tracks found, returning empty playlist");
+                response.put("tracks", new ArrayList<>());
+                response.put("message", "No liked tracks found. Please like some tracks first.");
+                return ResponseEntity.ok(response);
+            }
 
             List<Track> expanded = discoveryService.generateOneHourPlaylist(likedTracks, 60);
-            response.put("tracks", expanded);
+            System.out.println("ApiController: Generated " + expanded.size() + " expanded tracks");
+            
+            // Combine original liked tracks with expanded tracks (like web version)
+            List<Track> finalPlaylist = new ArrayList<>(likedTracks);
+            finalPlaylist.addAll(expanded);
+            
+            System.out.println("ApiController: Final playlist contains " + finalPlaylist.size() + " tracks");
+            response.put("tracks", finalPlaylist);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            System.out.println("ApiController: Error in preview-playlist: " + e.getMessage());
+            e.printStackTrace();
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
