@@ -25,10 +25,29 @@ public class SecurityConfig {
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 	    http
 	        .csrf(csrf -> csrf.disable())
-	        .authorizeHttpRequests(auth -> auth
-	            .requestMatchers("/", "/login", "/error", "/oauth2/**", "/h2-console/**", "/filters", "/spotify/exchange", "/api/tracks", "/api/auth/**").permitAll()
-	            .anyRequest().authenticated()
-	        )
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(
+                    "/", 
+                    "/login", 
+                    "/error", 
+                    "/oauth2/**", 
+                    "/h2-console/**", 
+                    "/filters", 
+                    "/spotify/exchange", 
+                    "/api/tracks", 
+                    "/api/auth/**",
+                    // Mobile JSON endpoints
+                    "/api/search",
+                    "/api/discover",
+                    "/api/liked",
+                    "/api/preview-playlist",
+                    "/api/create-playlist",
+                    // Spotify API endpoints for mobile
+                    "/spotify/artists/**",
+                    "/spotify/recommend/**"
+                ).permitAll()
+                .anyRequest().authenticated()
+            )
 	        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 	        .oauth2Login(oauth2 -> oauth2
 	            .loginPage("/login")

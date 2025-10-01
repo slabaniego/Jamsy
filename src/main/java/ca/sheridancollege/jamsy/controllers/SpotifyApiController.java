@@ -9,6 +9,7 @@ import ca.sheridancollege.jamsy.services.SpotifyService;
 import com.google.firebase.auth.FirebaseAuthException;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -91,5 +92,70 @@ public class SpotifyApiController {
         return spotifyService.getRecommendationsFromTemplate(template, accessToken);
     }
     
+    // Get artists by workout and mood - API endpoint for mobile
+    @GetMapping("/artists/workout/{workout}/mood/{mood}")
+    public ResponseEntity<List<Map<String, Object>>> getArtistsByWorkout(
+            @PathVariable String workout,
+            @PathVariable String mood,
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        try {
+            String accessToken = authHeader.replace("Bearer ", "").trim();
+            System.out.println("Getting artists for workout: " + workout + ", mood: " + mood);
+            
+            // Get categorized artists from Spotify
+            List<Map<String, Object>> categorizedArtists = spotifyService.getUserTopArtistsWithWorkoutCategories(accessToken, 200);
+            
+            // Filter artists by the selected workout category
+            List<Map<String, Object>> workoutArtists = categorizedArtists.stream()
+                .filter(artist -> {
+                    @SuppressWarnings("unchecked")
+                    List<String> categories = (List<String>) artist.get("workoutCategories");
+                    return categories != null && categories.contains(workout);
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+            System.out.println("Found " + workoutArtists.size() + " total artists for workout: " + workout);
+
+            // Shuffle and select 20 random artists from the filtered list
+            java.util.Collections.shuffle(workoutArtists);
+            List<Map<String, Object>> selectedArtists = workoutArtists.stream()
+                .limit(20)
+                .map(artist -> enhanceArtistWithRealImage(artist, accessToken))
+                .collect(java.util.stream.Collectors.toList());
+
+            System.out.println("Returning " + selectedArtists.size() + " artists for workout: " + workout);
+            return ResponseEntity.ok(selectedArtists);
+        } catch (Exception e) {
+            System.err.println("Error getting artists by workout: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(java.util.Collections.emptyList());
+        }
+    }
+    
+    private Map<String, Object> enhanceArtistWithRealImage(Map<String, Object> artist, String accessToken) {
+        try {
+            String artistId = (String) artist.get("id");
+            if (artistId != null) {
+                String imageUrl = spotifyService.getArtistImageUrl(accessToken, artistId);
+                if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+                    artist.put("imageUrl", imageUrl);
+                    System.out.println("✅ Got real image for: " + artist.get("name"));
+                    return artist;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error in enhanceArtistWithRealImage for: " + artist.get("name"));
+        }
+        
+        // Fallback to placeholder
+        return createPlaceholderImage(artist);
+    }
+    
+    private Map<String, Object> createPlaceholderImage(Map<String, Object> artist) {
+        artist.put("imageUrl", "https://via.placeholder.com/300x300/1DB954/FFFFFF?text=" + 
+                  java.net.URLEncoder.encode((String) artist.get("name"), java.nio.charset.StandardCharsets.UTF_8));
+        return artist;
+    }
     
 }
