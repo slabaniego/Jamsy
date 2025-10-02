@@ -820,85 +820,85 @@ public class SpotifyService {
     }
 
     
- // inside SpotifyService
+    // 	inside SpotifyService
 
- // --- helper: get recommendations by seed artists + feature params ---
- public List<ca.sheridancollege.jamsy.beans.Track> getRecommendationsByArtists(List<String> seedArtistIds, Map<String,String> featureParams, String accessToken, int limit) {
-     if (seedArtistIds == null || seedArtistIds.isEmpty()) return Collections.emptyList();
-     try {
-         String seeds = seedArtistIds.stream().limit(5).map(id -> URLEncoder.encode(id, StandardCharsets.UTF_8)).collect(Collectors.joining(","));
-         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(SPOTIFY_API_URL + "/recommendations")
-                 .queryParam("seed_artists", String.join(",", seedArtistIds))
-                 .queryParam("limit", limit);
+	 // --- helper: get recommendations by seed artists + feature params ---
+	 public List<Track> getRecommendationsByArtists(List<String> seedArtistIds, Map<String,String> featureParams, String accessToken, int limit) {
+	     if (seedArtistIds == null || seedArtistIds.isEmpty()) return Collections.emptyList();
+	     try {
+	         String seeds = seedArtistIds.stream().limit(5).map(id -> URLEncoder.encode(id, StandardCharsets.UTF_8)).collect(Collectors.joining(","));
+	         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(SPOTIFY_API_URL + "/recommendations")
+	                 .queryParam("seed_artists", String.join(",", seedArtistIds))
+	                 .queryParam("limit", limit);
+	
+	         if (featureParams != null) {
+	             for (Map.Entry<String,String> e : featureParams.entrySet()) {
+	                 builder.queryParam(e.getKey(), e.getValue());
+	             }
+	         }
+	
+	         String url = builder.toUriString();
+	         HttpHeaders headers = new HttpHeaders();
+	         headers.set("Authorization", "Bearer " + accessToken);
+	         HttpEntity<String> entity = new HttpEntity<>(headers);
+	         ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+	         if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null) {
+	             List<Map<String, Object>> items = (List<Map<String, Object>>) resp.getBody().get("tracks");
+	             List<ca.sheridancollege.jamsy.beans.Track> out = new ArrayList<>();
+	             if (items != null) {
+	                 for (Map<String,Object> t : items) {
+	                     out.add(mapSpotifyTrack(t));
+	                 }
+	             }
+	             return out;
+	         }
+	     } catch (Exception e) {
+	         System.out.println("❌ Error getRecommendationsByArtists: " + e.getMessage());
+	     }
+	     return Collections.emptyList();
+	 }
 
-         if (featureParams != null) {
-             for (Map.Entry<String,String> e : featureParams.entrySet()) {
-                 builder.queryParam(e.getKey(), e.getValue());
-             }
-         }
+	 // --- helper: artist top tracks (returns track IDs) ---
+	 public List<String> getArtistTopTracks(String artistId, String accessToken, int limit) {
+		 checkRateLimit("artist-top-tracks");
+	     try {
+	         String url = SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
+	         HttpHeaders headers = new HttpHeaders();
+	         headers.set("Authorization", "Bearer " + accessToken);
+	         HttpEntity<String> entity = new HttpEntity<>(headers);
+	         ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+	         if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null) {
+	             List<Map<String,Object>> tracks = (List<Map<String,Object>>) resp.getBody().get("tracks");
+	             if (tracks != null) {
+	                 return tracks.stream().map(t -> (String) t.get("id")).filter(Objects::nonNull).limit(limit).collect(Collectors.toList());
+	             }
+	         }
+	     } catch (Exception e) {
+	         System.out.println("❌ Error getArtistTopTracks: " + e.getMessage());
+	     }
+	     return Collections.emptyList();
+	 }
 
-         String url = builder.toUriString();
-         HttpHeaders headers = new HttpHeaders();
-         headers.set("Authorization", "Bearer " + accessToken);
-         HttpEntity<String> entity = new HttpEntity<>(headers);
-         ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-         if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null) {
-             List<Map<String, Object>> items = (List<Map<String, Object>>) resp.getBody().get("tracks");
-             List<ca.sheridancollege.jamsy.beans.Track> out = new ArrayList<>();
-             if (items != null) {
-                 for (Map<String,Object> t : items) {
-                     out.add(mapSpotifyTrack(t));
-                 }
-             }
-             return out;
-         }
-     } catch (Exception e) {
-         System.out.println("❌ Error getRecommendationsByArtists: " + e.getMessage());
-     }
-     return Collections.emptyList();
- }
+	 // --- helper: get track details as Track object ---
+	 public Track getTrackById(String trackId, String accessToken) {
+	     try {
+	         String url = SPOTIFY_API_URL + "/tracks/" + trackId;
+	         HttpHeaders headers = new HttpHeaders();
+	         headers.set("Authorization", "Bearer " + accessToken);
+	         HttpEntity<String> entity = new HttpEntity<>(headers);
+	         ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+	         if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null) {
+	             return mapSpotifyTrack(resp.getBody());
+	         }
+	     } catch (Exception e) {
+	         System.out.println("❌ Error getTrackById: " + e.getMessage());
+	     }
+	     return null;
+	 }
 
- // --- helper: artist top tracks (returns track IDs) ---
- public List<String> getArtistTopTracks(String artistId, String accessToken, int limit) {
-	 checkRateLimit("artist-top-tracks");
-     try {
-         String url = SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
-         HttpHeaders headers = new HttpHeaders();
-         headers.set("Authorization", "Bearer " + accessToken);
-         HttpEntity<String> entity = new HttpEntity<>(headers);
-         ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-         if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null) {
-             List<Map<String,Object>> tracks = (List<Map<String,Object>>) resp.getBody().get("tracks");
-             if (tracks != null) {
-                 return tracks.stream().map(t -> (String) t.get("id")).filter(Objects::nonNull).limit(limit).collect(Collectors.toList());
-             }
-         }
-     } catch (Exception e) {
-         System.out.println("❌ Error getArtistTopTracks: " + e.getMessage());
-     }
-     return Collections.emptyList();
- }
-
- // --- helper: get track details as Track object ---
- public ca.sheridancollege.jamsy.beans.Track getTrackById(String trackId, String accessToken) {
-     try {
-         String url = SPOTIFY_API_URL + "/tracks/" + trackId;
-         HttpHeaders headers = new HttpHeaders();
-         headers.set("Authorization", "Bearer " + accessToken);
-         HttpEntity<String> entity = new HttpEntity<>(headers);
-         ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-         if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null) {
-             return mapSpotifyTrack(resp.getBody());
-         }
-     } catch (Exception e) {
-         System.out.println("❌ Error getTrackById: " + e.getMessage());
-     }
-     return null;
- }
-
- // --- helper: related artists ids (for fallback expansion) ---
- public List<String> getRelatedArtistIds(List<String> artistIds, String accessToken) {
-	    List<String> relatedIds = new ArrayList<>();
+	 // --- helper: related artists ids (for fallback expansion) ---
+	 public List<String> getRelatedArtistIds(List<String> artistIds, String accessToken) {
+		    List<String> relatedIds = new ArrayList<>();
 	    for (String artistId : artistIds) {
 	        try {
 	            // Call Spotify API
@@ -926,15 +926,17 @@ public class SpotifyService {
 	}
 
 
- // --- helper: create playlist + add tracks (you already had these calls in WebController, but here are implementations) ---
- public String createPlaylist(String accessToken, String playlistName) {
+	 // Create a playlist - empty for now but return the playlist ID
+	 public String createPlaylist(String accessToken, String playlistName) {
      try {
-         String userId = getSpotifyUserId(accessToken);
+         String userId = getSpotifyUserId(accessToken); // get user's ID
          String url = SPOTIFY_API_URL + "/users/" + userId + "/playlists";
          HttpHeaders headers = new HttpHeaders();
          headers.set("Authorization", "Bearer " + accessToken);
          headers.setContentType(MediaType.APPLICATION_JSON);
+         
          Map<String,Object> body = new HashMap<>();
+         
          body.put("name", playlistName);
          body.put("public", false);
          body.put("description", "Created from Mood/Workout discovery");
@@ -949,9 +951,37 @@ public class SpotifyService {
      return null;
  }
  
- // Overload method
- public String createPlaylist(String accessToken, String playlistName, List<Track> tracks) {
-	    // Step 1: Create empty playlist
+ // Add tracks to a playlist 
+ 	public void addTracksToPlaylist(String accessToken, String playlistId, List<String> trackUris) {
+	    if (trackUris == null || trackUris.isEmpty()) return;
+
+	    int batchSize = 100;
+	    for (int i = 0; i < trackUris.size(); i += batchSize) {
+	        List<String> batch = trackUris.subList(i, Math.min(i + batchSize, trackUris.size()));
+
+	        try {
+	            String url = SPOTIFY_API_URL + "/playlists/" + playlistId + "/tracks";
+	            HttpHeaders headers = new HttpHeaders();
+	            headers.set("Authorization", "Bearer " + accessToken);
+	            headers.setContentType(MediaType.APPLICATION_JSON);
+
+	            Map<String,Object> body = new HashMap<>();
+	            body.put("uris", batch);
+
+	            HttpEntity<Map<String,Object>> entity = new HttpEntity<>(body, headers);
+	            restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+
+	            System.out.println("✅ Added " + batch.size() + " tracks to playlist " + playlistId);
+	        } catch (Exception e) {
+	            System.out.println("❌ Error adding tracks: " + e.getMessage());
+	        }
+	    }
+	}
+
+ 
+	 // Populate the playlist 
+	 public String createPlaylist(String accessToken, String playlistName, List<Track> tracks) {
+	    // Step 1: call create playlist will create an empty one
 	    String playlistId = createPlaylist(accessToken, playlistName);
 
 	    // Step 2: Convert tracks to URIs (with ID lookup if missing)
@@ -980,62 +1010,35 @@ public class SpotifyService {
 	    return "https://open.spotify.com/playlist/" + playlistId;
 	}
 
- public void addTracksToPlaylist(String accessToken, String playlistId, List<String> trackUris) {
-	    if (trackUris == null || trackUris.isEmpty()) return;
-
-	    int batchSize = 100;
-	    for (int i = 0; i < trackUris.size(); i += batchSize) {
-	        List<String> batch = trackUris.subList(i, Math.min(i + batchSize, trackUris.size()));
-
-	        try {
-	            String url = SPOTIFY_API_URL + "/playlists/" + playlistId + "/tracks";
-	            HttpHeaders headers = new HttpHeaders();
-	            headers.set("Authorization", "Bearer " + accessToken);
-	            headers.setContentType(MediaType.APPLICATION_JSON);
-
-	            Map<String,Object> body = new HashMap<>();
-	            body.put("uris", batch);
-
-	            HttpEntity<Map<String,Object>> entity = new HttpEntity<>(body, headers);
-	            restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-
-	            System.out.println("✅ Added " + batch.size() + " tracks to playlist " + playlistId);
-	        } catch (Exception e) {
-	            System.out.println("❌ Error adding tracks: " + e.getMessage());
-	        }
-	    }
-	}
-
-
- // --- helper: map raw Spotify track map -> your Track bean (used earlier) ---
- private ca.sheridancollege.jamsy.beans.Track mapSpotifyTrack(Map<String, Object> t) {
-     ca.sheridancollege.jamsy.beans.Track track = new ca.sheridancollege.jamsy.beans.Track();
-     if (t == null) return null;
-     track.setId((String) t.get("id"));
-     track.setName((String) t.get("name"));
-     track.setPopularity(t.get("popularity") == null ? null : ((Number) t.get("popularity")).intValue());
-     track.setPreviewUrl((String) t.get("preview_url"));
-
-     // artists
-     List<Map<String,Object>> artistsList = (List<Map<String,Object>>) t.get("artists");
-     if (artistsList != null) {
-         List<String> names = artistsList.stream()
-                 .map(a -> (String) a.get("name"))
-                 .collect(Collectors.toList());
-         track.setArtists(names);
-     }
-
-     // album images
-     Map<String,Object> album = (Map<String,Object>) t.get("album");
-     if (album != null) {
-         List<Map<String,Object>> images = (List<Map<String,Object>>) album.get("images");
-         if (images != null && !images.isEmpty()) {
-             // choose the first image (largest)
-             track.setAlbumCover((String) images.get(0).get("url"));
-         }
-     }
-     return track;
- }
+	 // --- helper: map raw Spotify track map -> Track bean (used earlier) ---
+	 private Track mapSpotifyTrack(Map<String, Object> t) {
+	     ca.sheridancollege.jamsy.beans.Track track = new ca.sheridancollege.jamsy.beans.Track();
+	     if (t == null) return null;
+	     track.setId((String) t.get("id"));
+	     track.setName((String) t.get("name"));
+	     track.setPopularity(t.get("popularity") == null ? null : ((Number) t.get("popularity")).intValue());
+	     track.setPreviewUrl((String) t.get("preview_url"));
+	
+	     // artists
+	     List<Map<String,Object>> artistsList = (List<Map<String,Object>>) t.get("artists");
+	     if (artistsList != null) {
+	         List<String> names = artistsList.stream()
+	                 .map(a -> (String) a.get("name"))
+	                 .collect(Collectors.toList());
+	         track.setArtists(names);
+	     }
+	
+	     // album images
+	     Map<String,Object> album = (Map<String,Object>) t.get("album");
+	     if (album != null) {
+	         List<Map<String,Object>> images = (List<Map<String,Object>>) album.get("images");
+	         if (images != null && !images.isEmpty()) {
+	             // choose the first image (largest)
+	             track.setAlbumCover((String) images.get(0).get("url"));
+	         }
+	     }
+	     return track;
+	 }
 
     private String parseImageUrlFromJson(String jsonResponse) {
         try {
@@ -1060,31 +1063,6 @@ public class SpotifyService {
             return null;
         }
     }
-    
-    /*public List<String> getArtistTopTracks(String artistId, String accessToken, int limit) {
-        try {
-            String url = SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + accessToken);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                Map<String, Object> responseBody = response.getBody();
-                List<Map<String, Object>> tracks = (List<Map<String, Object>>) responseBody.get("tracks");
-                
-                return tracks.stream()
-                    .limit(limit)
-                    .map(track -> (String) track.get("id"))
-                    .collect(Collectors.toList());
-            }
-        } catch (Exception e) {
-            System.out.println("Error getting artist top tracks: " + e.getMessage());
-        }
-        return Collections.emptyList();
-    }*/
     
     public List<String> getRelatedArtistIds(String artistId, String accessToken, int limit) {
         String url = "https://api.spotify.com/v1/artists/" + artistId + "/related-artists";
@@ -1112,28 +1090,29 @@ public class SpotifyService {
             List<String> seedTracks,
             String accessToken,
             int limit) {
-String url = "https://api.spotify.com/v1/recommendations?"
-+ "limit=" + limit
-+ (seedArtists.isEmpty() ? "" : "&seed_artists=" + String.join(",", seedArtists))
-+ (seedTracks.isEmpty() ? "" : "&seed_tracks=" + String.join(",", seedTracks));
-
-HttpHeaders headers = new HttpHeaders();
-headers.set("Authorization", "Bearer " + accessToken);
-HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-RestTemplate restTemplate = new RestTemplate();
-ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-
-List<String> trackIds = new ArrayList<>();
-if (response.getStatusCode().is2xxSuccessful()) {
-List<Map<String, Object>> tracks = (List<Map<String, Object>>) response.getBody().get("tracks");
-for (Map<String, Object> t : tracks) {
-trackIds.add((String) t.get("id"));
-}
-}
-
-return trackIds;
-}
+		String url = "https://api.spotify.com/v1/recommendations?"
+		+ "limit=" + limit
+		+ (seedArtists.isEmpty() ? "" : "&seed_artists=" + String.join(",", seedArtists))
+		+ (seedTracks.isEmpty() ? "" : "&seed_tracks=" + String.join(",", seedTracks));
+		
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + accessToken);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+		
+		RestTemplate restTemplate = new RestTemplate();
+		ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+		
+		List<String> trackIds = new ArrayList<>();
+		
+		if (response.getStatusCode().is2xxSuccessful()) {
+		List<Map<String, Object>> tracks = (List<Map<String, Object>>) response.getBody().get("tracks");
+			for (Map<String, Object> t : tracks) {
+			trackIds.add((String) t.get("id"));
+			}
+		}
+		
+		return trackIds;
+	}
 
     
 
@@ -1200,35 +1179,6 @@ return trackIds;
         }
         return params;
     }
-
-    /*private Track mapSpotifyTrack(Map<String, Object> trackData) {
-        Track track = new Track();
-        track.setId((String) trackData.get("id"));
-        track.setName((String) trackData.get("name"));
-        track.setPreviewUrl((String) trackData.get("preview_url"));
-        track.setPopularity((Integer) trackData.get("popularity"));
-        
-        // Get artists
-        List<Map<String, Object>> artists = (List<Map<String, Object>>) trackData.get("artists");
-        List<String> artistNames = artists.stream()
-            .map(artist -> (String) artist.get("name"))
-            .collect(Collectors.toList());
-        track.setArtists(artistNames);
-        
-        // Get album cover
-        Map<String, Object> album = (Map<String, Object>) trackData.get("album");
-        List<Map<String, Object>> images = (List<Map<String, Object>>) album.get("images");
-        if (images != null && !images.isEmpty()) {
-            track.setAlbumCover((String) images.get(0).get("url"));
-        }
-        
-        // Get external URL
-        Map<String, Object> externalUrls = (Map<String, Object>) trackData.get("external_urls");
-        track.setExternalUrl((String) externalUrls.get("spotify"));
-        
-        return track;
-    }
-    */
     
     private String cleanTrackName(String raw) {
         return raw.replaceAll("\\(.*?\\)", "")  // remove (feat. SZA), (Remaster), etc.

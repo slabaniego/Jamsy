@@ -49,7 +49,7 @@ public class PlaylistGeneratorService {
     /**
      * Create a playlist and immediately populate it with tracks.
      */
-    public String createPlaylist(String accessToken, String playlistName, List<Track> tracks) {
+    public String createPlaylistWithTracks(String accessToken, String playlistName, List<Track> tracks) {
         String playlistId = createPlaylist(accessToken, playlistName);
 
         if (playlistId == null) {
