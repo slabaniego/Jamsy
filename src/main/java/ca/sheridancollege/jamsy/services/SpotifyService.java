@@ -781,9 +781,6 @@ public class SpotifyService {
         }
         return false;
     }
-
-    
-    
     
     public String getArtistImageUrl(String accessToken, String artistId) {
         try {
@@ -1329,6 +1326,8 @@ return trackIds;
         return Collections.emptyList();
     }
 
+    
+    // Deprecated??
     public List<Track> getRecommendationsWithParams(List<String> seedTracks, Map<String, Object> params, 
                                                    String accessToken, int limit) {
         try {
@@ -1424,8 +1423,6 @@ return trackIds;
             return null;
         }
     }
-
-    
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> extractSearchTracks(Map<String, Object> response) {
