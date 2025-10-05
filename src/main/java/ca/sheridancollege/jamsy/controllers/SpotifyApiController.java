@@ -113,50 +113,68 @@ public class SpotifyApiController {
 
 	/**
 	 * Step 4 → Get artists by workout and mood (for mobile use)
-	 * Retrieves the user's top artists from Spotify and filters them
-	 * based on genre and workout type.
+	 * ---------------------------------------------------------
+	 * This mirrors the web flow where the user first chooses artists.
+	 * The endpoint returns a curated list of artists related to the selected
+	 * workout and mood, which the mobile app can display for user selection.
 	 */
 	@GetMapping("/artists/workout/{workout}/mood/{mood}")
-	public ResponseEntity<List<Map<String, Object>>> getArtistsByWorkout(
+	public ResponseEntity<Map<String, Object>> getArtistsByWorkoutAndMood(
 	        @PathVariable String workout,
 	        @PathVariable String mood,
-	        @RequestHeader("Authorization") String authHeader
-	) {
+	        @RequestHeader("Authorization") String authHeader) {
+
+	    Map<String, Object> response = new HashMap<>();
+
 	    try {
 	        String accessToken = authHeader.replace("Bearer ", "").trim();
-	        System.out.println("🎧 Getting artists for workout: " + workout + ", mood: " + mood);
+	        System.out.println("🎧 Mobile API → Getting artists for workout: " + workout + ", mood: " + mood);
 
-	        // Step 1️⃣: Get user's top artists from Spotify
-	        List<Map<String, Object>> topArtists = spotifyUserService.getUserTopArtists(accessToken, 50);
-	        if (topArtists == null || topArtists.isEmpty()) {
-	            System.out.println("⚠️ No top artists found for this user.");
-	            return ResponseEntity.ok(Collections.emptyList());
+	        // 1️⃣ Fetch user's top tracks (we no longer use SpotifyService, so use SpotifyUserService)
+	        List<Track> userTopTracks = spotifyUserService.getTopTracks(accessToken);
+
+	        if (userTopTracks == null || userTopTracks.isEmpty()) {
+	            System.out.println("⚠️ No top tracks found for user. Returning empty artist list.");
+	            response.put("artists", Collections.emptyList());
+	            return ResponseEntity.ok(response);
 	        }
 
-	        // Step 2️⃣: Add basic workout categorization based on genre
-	        for (Map<String, Object> artist : topArtists) {
+	        // 2️⃣ Extract unique artist names from top tracks
+	        List<String> artistNames = userTopTracks.stream()
+	                .flatMap(track -> track.getArtists().stream())
+	                .distinct()
+	                .limit(50)
+	                .toList();
+
+	        System.out.println("✅ Extracted " + artistNames.size() + " unique artists from top tracks.");
+
+	        // 3️⃣ Fetch artist details from SpotifyArtistService
+	        List<Map<String, Object>> artistDetails = spotifyArtistService.getArtistNames(artistNames, accessToken);
+
+	        // 4️⃣ Add light categorization for workouts (like the web version)
+	        for (Map<String, Object> artist : artistDetails) {
 	            @SuppressWarnings("unchecked")
 	            List<String> genres = (List<String>) artist.get("genres");
-	            if (genres == null) genres = List.of();
+	            if (genres == null) genres = new ArrayList<>();
 
+	            String genreStr = String.join(",", genres).toLowerCase();
 	            List<String> workoutCategories = new ArrayList<>();
-	            String genresStr = String.join(",", genres).toLowerCase();
 
-	            if (genresStr.contains("pop") || genresStr.contains("dance") || genresStr.contains("edm")) {
+	            if (genreStr.contains("pop") || genreStr.contains("dance") || genreStr.contains("edm")) {
 	                workoutCategories.add("Cardio");
 	            }
-	            if (genresStr.contains("rock") || genresStr.contains("metal") || genresStr.contains("hip hop")) {
+	            if (genreStr.contains("rock") || genreStr.contains("metal") || genreStr.contains("hip hop")) {
 	                workoutCategories.add("Strength Training");
 	            }
-	            if (genresStr.contains("chill") || genresStr.contains("ambient") || genresStr.contains("acoustic")) {
+	            if (genreStr.contains("chill") || genreStr.contains("ambient") || genreStr.contains("acoustic")) {
 	                workoutCategories.add("Yoga");
 	            }
 
 	            artist.put("workoutCategories", workoutCategories);
 	        }
 
-	        // Step 3️⃣: Filter by workout
-	        List<Map<String, Object>> filteredArtists = topArtists.stream()
+	        // 5️⃣ Filter by workout
+	        List<Map<String, Object>> filteredArtists = artistDetails.stream()
 	                .filter(a -> {
 	                    @SuppressWarnings("unchecked")
 	                    List<String> cats = (List<String>) a.get("workoutCategories");
@@ -164,21 +182,23 @@ public class SpotifyApiController {
 	                })
 	                .toList();
 
-	        System.out.println("✅ Found " + filteredArtists.size() + " artists for workout: " + workout);
-
-	        // Step 4️⃣: Shuffle and pick 20 random ones
+	        // 6️⃣ Shuffle and limit to 20
 	        Collections.shuffle(filteredArtists);
-	        List<Map<String, Object>> selectedArtists = filteredArtists.stream()
-	                .limit(20)
-	                .map(a -> enhanceArtistWithRealImage(a))
-	                .toList();
+	        List<Map<String, Object>> selected = filteredArtists.stream().limit(20).toList();
 
-	        return ResponseEntity.ok(selectedArtists);
+	        System.out.println("✅ Returning " + selected.size() + " artists for workout: " + workout);
+
+	        response.put("workout", workout);
+	        response.put("mood", mood);
+	        response.put("artists", selected);
+
+	        return ResponseEntity.ok(response);
 
 	    } catch (Exception e) {
-	        System.err.println("❌ Error getting artists by workout: " + e.getMessage());
+	        System.err.println("❌ Error fetching artists for workout/mood: " + e.getMessage());
 	        e.printStackTrace();
-	        return ResponseEntity.status(500).body(Collections.emptyList());
+	        response.put("error", e.getMessage());
+	        return ResponseEntity.status(500).body(response);
 	    }
 	}
 

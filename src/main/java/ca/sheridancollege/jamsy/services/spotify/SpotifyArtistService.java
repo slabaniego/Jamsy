@@ -68,6 +68,40 @@ public class SpotifyArtistService {
         }
         return null;
     }
+	
+	public List<Map<String, Object>> getArtistNames(List<String> artistIds, String accessToken) {
+	    List<Map<String, Object>> artistDetails = new ArrayList<>();
+	    for (String artistId : artistIds) {
+	        try {
+	            String url = "https://api.spotify.com/v1/artists/" + artistId;
+	            HttpHeaders headers = new HttpHeaders();
+	            headers.set("Authorization", "Bearer " + accessToken);
+	            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+	            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+	            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+	                Map<String, Object> body = response.getBody();
+
+	                Map<String, Object> artistInfo = new HashMap<>();
+	                artistInfo.put("id", body.get("id"));
+	                artistInfo.put("name", body.get("name"));
+	                artistInfo.put("genres", body.get("genres"));
+
+	                // get image if exists
+	                List<Map<String, Object>> images = (List<Map<String, Object>>) body.get("images");
+	                if (images != null && !images.isEmpty()) {
+	                    artistInfo.put("imageUrl", images.get(0).get("url"));
+	                }
+
+	                artistDetails.add(artistInfo);
+	            }
+	        } catch (Exception e) {
+	            System.out.println("Error getting artist details for " + artistId + ": " + e.getMessage());
+	        }
+	    }
+	    return artistDetails;
+	}
+
 
 	private String parseImageUrlFromJson(String jsonResponse) {
         try {
