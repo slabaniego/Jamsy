@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -23,27 +24,32 @@ import org.springframework.web.client.RestTemplate;
 import ca.sheridancollege.jamsy.services.DeezerService;
 import ca.sheridancollege.jamsy.services.LastFmService;
 import ca.sheridancollege.jamsy.services.MusicBrainzService;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class SpotifyArtistService {
 	
 	private final RestTemplate restTemplate;
-	private final SpotifyApiClient spotifyClientService = new SpotifyApiClient();
+	private final SpotifyApiClient spotifyApiClient;
 	private final Map<String, List<Map<String, Object>>> artistCache = new ConcurrentHashMap<>();
 	private final LastFmService lastFmService;
 	private SpotifyTrackService spotifyTrackService;
 	private MusicBrainzService musicBrainzService;
 	
+	@Autowired
 	 public SpotifyArtistService(
 			 LastFmService last, 
 			 RestTemplate restTemplate,
 			 SpotifyTrackService spotifyTrackService,
-			 MusicBrainzService musicBrainzService
+			 MusicBrainzService musicBrainzService,
+			 SpotifyApiClient spotifyApiClient
 		 ) {
 	        this.lastFmService = last;
 	        this.restTemplate = restTemplate;
 	        this.spotifyTrackService = spotifyTrackService;
 	        this.musicBrainzService = musicBrainzService;
+	        this.spotifyApiClient = spotifyApiClient;
 	    }
 	
 	public String getArtistName(String artistId, String accessToken) {
@@ -125,9 +131,9 @@ public class SpotifyArtistService {
 	
 	public List<String> getArtistTopTracks(String artistId, String accessToken, int limit) {
 		 
-		spotifyClientService.checkRateLimit("artist-top-tracks");
+		spotifyApiClient.checkRateLimit("artist-top-tracks");
 	     try {
-	         String url = spotifyClientService.SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
+	         String url = spotifyApiClient.SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
 	         HttpHeaders headers = new HttpHeaders();
 	         headers.set("Authorization", "Bearer " + accessToken);
 	         HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -209,7 +215,7 @@ public class SpotifyArtistService {
         try {
             while (retrieved < limit) {
                 int batchSize = Math.min(50, limit - retrieved);
-                String url = spotifyClientService.SPOTIFY_API_URL + "/me/top/artists?limit=" + batchSize + "&offset=" + offset + "&time_range=long_term";
+                String url = spotifyApiClient.SPOTIFY_API_URL + "/me/top/artists?limit=" + batchSize + "&offset=" + offset + "&time_range=long_term";
                 
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Authorization", "Bearer " + accessToken);

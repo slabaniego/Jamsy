@@ -28,6 +28,9 @@ public class PlaylistGeneratorService {
      * Create an empty playlist in the user’s account.
      */
     public String createPlaylist(String accessToken, String playlistName) {
+    	
+    	System.out.println("🎯 spotifyApiClient instance: " + spotifyApiClient);
+
         try {
             String userId = spotifyUserService.getSpotifyUserId(accessToken);
             String url = SpotifyApiClient.SPOTIFY_API_URL + "/users/" + userId + "/playlists";

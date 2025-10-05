@@ -47,7 +47,7 @@ public class PlaylistController {
      */
     @GetMapping("/preview-playlist")
     public String previewPlaylist(HttpSession session, Model model) {
-        List<Track> likedTracks = (List<Track>) session.getAttribute("likedTracks");
+    	List<Track> likedTracks = (List<Track>) session.getAttribute("discoveryTracks");
         if (likedTracks == null || likedTracks.isEmpty()) {
             model.addAttribute("error", "No liked songs available to create a playlist.");
             return "liked";

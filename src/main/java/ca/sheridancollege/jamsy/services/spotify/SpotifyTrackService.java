@@ -22,12 +22,17 @@ import ca.sheridancollege.jamsy.beans.Track;
 @Service
 public class SpotifyTrackService {
 	
-	private final SpotifyApiClient spotifyClientService = new SpotifyApiClient();
-	private final RestTemplate restTemplate = new RestTemplate();
+	private final SpotifyApiClient spotifyApiClient;
+	private final RestTemplate restTemplate;
+	
+	public SpotifyTrackService(SpotifyApiClient spotifyApiClient, RestTemplate restTemplate) {
+		this.spotifyApiClient = spotifyApiClient;
+		this.restTemplate = restTemplate;
+	}
 	
 	public Track getTrackById(String trackId, String accessToken) {
 	     try {
-	         String url = spotifyClientService.SPOTIFY_API_URL + "/tracks/" + trackId;
+	         String url = spotifyApiClient.SPOTIFY_API_URL + "/tracks/" + trackId;
 	         HttpHeaders headers = new HttpHeaders();
 	         headers.set("Authorization", "Bearer " + accessToken);
 	         HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -43,7 +48,7 @@ public class SpotifyTrackService {
 	
 	public String getTrackPreviewUrl(String trackId, String accessToken) {
         try {
-            String url = spotifyClientService.SPOTIFY_API_URL + "/tracks/" + trackId;
+            String url = spotifyApiClient.SPOTIFY_API_URL + "/tracks/" + trackId;
             
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + accessToken);
@@ -81,7 +86,7 @@ public class SpotifyTrackService {
             String query = "track:" + URLEncoder.encode(cleanTrackName(trackName), StandardCharsets.UTF_8) +
                            " artist:" + URLEncoder.encode(artistName, StandardCharsets.UTF_8);
 
-            String url = spotifyClientService.SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=1";
+            String url = spotifyApiClient.SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=1";
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + accessToken);
@@ -117,7 +122,7 @@ public class SpotifyTrackService {
         headers.set("Authorization", "Bearer " + accessToken);
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
-        String url = spotifyClientService.SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=50";
+        String url = spotifyApiClient.SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=50";
 
         ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
         List<Map<String, Object>> rawTracks = extractSearchTracks(response.getBody());
@@ -138,7 +143,7 @@ public class SpotifyTrackService {
     public List<String> searchArtistTopTracks(String artistName, String accessToken, int limit) {
         try {
             String query = "artist:" + URLEncoder.encode(artistName, "UTF-8");
-            String url = spotifyClientService.SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=" + limit;
+            String url = spotifyApiClient.SPOTIFY_API_URL + "/search?q=" + query + "&type=track&limit=" + limit;
             
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + accessToken);
@@ -289,7 +294,7 @@ public class SpotifyTrackService {
     public Map<String, Double> getArtistAudioFeatures(String accessToken, String artistId) {
         try {
             // Get artist's top tracks
-            String topTracksUrl = spotifyClientService.SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
+            String topTracksUrl = spotifyApiClient.SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
             
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + accessToken);
@@ -327,7 +332,7 @@ public class SpotifyTrackService {
         
         try {
             String trackIdsParam = String.join(",", trackIds);
-            String audioFeaturesUrl = spotifyClientService.SPOTIFY_API_URL + "/audio-features?ids=" + trackIdsParam;
+            String audioFeaturesUrl = spotifyApiClient.SPOTIFY_API_URL + "/audio-features?ids=" + trackIdsParam;
             
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + accessToken);
@@ -361,7 +366,7 @@ public class SpotifyTrackService {
         try {
             for (String artistId : artistIds) {
                 // Get artist's top tracks
-                String topTracksUrl = spotifyClientService.SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
+                String topTracksUrl = spotifyApiClient.SPOTIFY_API_URL + "/artists/" + artistId + "/top-tracks?market=US";
                 
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Authorization", "Bearer " + accessToken);

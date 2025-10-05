@@ -20,12 +20,15 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
 @Service
-@AllArgsConstructor
-@NoArgsConstructor
 public class SpotifyUserService {
 	
-	private RestTemplate restTemplate;
-	private SpotifyTrackService spotifyTrackService;
+	private final RestTemplate restTemplate;
+	private final SpotifyTrackService spotifyTrackService;
+	
+	public SpotifyUserService(RestTemplate restTemplate, SpotifyTrackService spotifyTrackService) {
+        this.restTemplate = restTemplate;
+        this.spotifyTrackService = spotifyTrackService;
+    }
 
 	 public String getSpotifyUserId(String accessToken) {
         HttpHeaders headers = new HttpHeaders();

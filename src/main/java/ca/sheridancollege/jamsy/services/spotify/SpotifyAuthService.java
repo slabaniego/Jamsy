@@ -39,27 +39,11 @@ public class SpotifyAuthService {
     
     private static final String TOKEN_URL = "https://accounts.spotify.com/api/token";
     
-    private final RestTemplate restTemplate = new RestTemplate();
-    
-//    public String getUserAccessToken(String code, String redirectUri) {
-//        HttpHeaders headers = new HttpHeaders();
-//        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-//
-//        String body = "grant_type=authorization_code&code=" + code +
-//                "&redirect_uri=" + redirectUri +
-//                "&client_id=" + clientId + "&client_secret=" + clientSecret;
-//
-//        HttpEntity<String> entity = new HttpEntity<>(body, headers);
-//        ResponseEntity<Map> response = restTemplate.exchange(
-//                "https://accounts.spotify.com/api/token",
-//                HttpMethod.POST, entity, Map.class);
-//
-//        return (String) response.getBody().get("access_token");
-//    }
-//
-//    public String getUserAccessToken(String code) {
-//        return getUserAccessToken(code, mobileRedirectUri);
-//    }
+    private final RestTemplate restTemplate ;
+    	
+    public SpotifyAuthService(RestTemplate restTemplate) {
+    	this.restTemplate = restTemplate;
+    }
     
     /**
      * Exchanges the Spotify authorization code for an access token and refresh token.

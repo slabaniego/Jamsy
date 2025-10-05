@@ -3,6 +3,7 @@ package ca.sheridancollege.jamsy.services.spotify;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -10,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import jakarta.annotation.PostConstruct;
 
 
 /*
@@ -19,11 +22,17 @@ import org.springframework.web.client.RestTemplate;
 public class SpotifyApiClient {
 	
 	public static final String SPOTIFY_API_URL = "https://api.spotify.com/v1";
-	 private final RestTemplate restTemplate = new RestTemplate();
+	private final RestTemplate restTemplate;
 	
 	private static final int MAX_REQUESTS_PER_MINUTE = 50;
     private static final Map<String, RateLimitInfo> rateLimitMap = new ConcurrentHashMap<>();
 	
+    @Autowired
+    public SpotifyApiClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+        System.out.println("✅ RestTemplate injected successfully into SpotifyApiClient! " + this);
+    }
+    
 	 // Add this inner class
     private static class RateLimitInfo {
         private int requestCount = 0;
@@ -70,6 +79,9 @@ public class SpotifyApiClient {
      * Generic POST request to Spotify API.
      */
     public <T> T post(String url, Object body, String accessToken, Class<T> responseType) {
+    	System.out.println("🎯 Entered SpotifyApiClient.post() with instance: " + this);
+        System.out.println("🎯 RestTemplate inside post(): " + restTemplate);
+	 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -93,4 +105,10 @@ public class SpotifyApiClient {
         ResponseEntity<T> response = restTemplate.exchange(url, HttpMethod.PUT, entity, responseType);
         return response.getBody();
     }
+    
+    @PostConstruct
+    public void verify() {
+        System.out.println("✅ SpotifyApiClient bean loaded: " + this);
+    }
+
 }
