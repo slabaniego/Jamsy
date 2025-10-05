@@ -63,6 +63,12 @@ public class LastFmService {
 
     public List<String> getSimilarArtists(String artistName, int limit) {
         try {
+            // Add null check to prevent the "Cannot invoke String.length() because s is null" error
+            if (artistName == null || artistName.trim().isEmpty()) {
+                System.out.println("❌ Error getting similar artists: artistName is null or empty");
+                return Collections.emptyList();
+            }
+            
             String url = baseUrl + "?method=artist.getSimilar&artist=" +
                     URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
                     "&api_key=" + apiKey + "&format=json&limit=" + limit;
@@ -91,6 +97,12 @@ public class LastFmService {
 
     public List<Track> getArtistTopTracks(String artistName, int limit) {
         try {
+            // Add null check to prevent the "Cannot invoke String.length() because s is null" error
+            if (artistName == null || artistName.trim().isEmpty()) {
+                System.out.println("❌ Error getting top tracks: artistName is null or empty");
+                return Collections.emptyList();
+            }
+            
             String url = baseUrl + "?method=artist.getTopTracks&artist=" +
                     URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
                     "&api_key=" + apiKey + "&format=json&limit=" + limit;
@@ -156,6 +168,12 @@ public class LastFmService {
     // Similar tracks 
     public List<Track> getSimilarTracks(String trackName, String artistName, int limit) {
         try {
+            // Add null checks to prevent the "Cannot invoke String.length() because s is null" error
+            if (trackName == null || artistName == null || trackName.trim().isEmpty() || artistName.trim().isEmpty()) {
+                System.out.println("❌ Error getting similar tracks: trackName or artistName is null or empty");
+                return Collections.emptyList();
+            }
+            
             String url = baseUrl + "?method=track.getSimilar" +
                     "&artist=" + URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
                     "&track=" + URLEncoder.encode(trackName, StandardCharsets.UTF_8) +
