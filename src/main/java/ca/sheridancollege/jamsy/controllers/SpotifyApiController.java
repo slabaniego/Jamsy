@@ -5,91 +5,119 @@ import ca.sheridancollege.jamsy.beans.SpotifyAuthResponse;
 import ca.sheridancollege.jamsy.beans.Track;
 import ca.sheridancollege.jamsy.services.FirebaseAuthServices;
 import ca.sheridancollege.jamsy.services.PlaylistTemplateService;
-import ca.sheridancollege.jamsy.services.SpotifyService;
+import ca.sheridancollege.jamsy.services.spotify.SpotifyAuthService;
+import ca.sheridancollege.jamsy.services.spotify.SpotifyUserService;
+import ca.sheridancollege.jamsy.services.recommendation.*;
 import com.google.firebase.auth.FirebaseAuthException;
-
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
+/**
+ * REST controller for mobile and external clients.
+ * Handles Spotify authentication, Firebase linking,
+ * and playlist recommendations via templates.
+ */
 @RestController
-@RequestMapping("/spotify")
+@RequestMapping("/api/spotify")
 public class SpotifyApiController {
 
-    private final SpotifyService spotifyService;
+    private final SpotifyAuthService spotifyAuthService;
+    private final SpotifyUserService spotifyUserService;
     private final FirebaseAuthServices firebaseAuthService;
     private final PlaylistTemplateService templateService;
+    private final RecommendationService recommendationService;
 
-    @Autowired
     public SpotifyApiController(
-    		SpotifyService spotifyService, 
-    		FirebaseAuthServices firebaseAuthService,
-    		PlaylistTemplateService templateService
-	) {
-        this.spotifyService = spotifyService;
+            SpotifyAuthService spotifyAuthService,
+            SpotifyUserService spotifyUserService,
+            FirebaseAuthServices firebaseAuthService,
+            PlaylistTemplateService templateService,
+            RecommendationService recommendationService
+    ) {
+        this.spotifyAuthService = spotifyAuthService;
+        this.spotifyUserService = spotifyUserService;
         this.firebaseAuthService = firebaseAuthService;
         this.templateService = templateService;
+        this.recommendationService = recommendationService;
     }
 
+    /**
+     * Step 1 → Exchange authorization code for Spotify access token
+     * and issue a custom Firebase token for the mobile app.
+     */
     @PostMapping("/exchange")
     public ResponseEntity<?> exchangeCodeForToken(
             @RequestParam("code") String code,
-            @RequestParam("redirect_uri") String redirectUri) {
-        
+            @RequestParam("redirect_uri") String redirectUri
+    ) {
         try {
-            // Exchange code for Spotify token
-            String spotifyAccessToken = spotifyService.getUserAccessToken(code, redirectUri);
-            
-            // Get Spotify user ID to use as Firebase UID
-            String spotifyUserId = spotifyService.getSpotifyUserId(spotifyAccessToken);
-            
-            // Generate Firebase custom token
+            // 1️⃣ Exchange authorization code for Spotify access + refresh tokens
+            Map<String, Object> tokenData = spotifyAuthService.exchangeCodeForAccessToken(code, redirectUri);
+            String spotifyAccessToken = (String) tokenData.get("access_token");
+            String refreshToken = (String) tokenData.get("refresh_token");
+
+            // 2️⃣ Get the Spotify user ID (used as Firebase UID)
+            String spotifyUserId = spotifyUserService.getSpotifyUserId(spotifyAccessToken);
+
+            // 3️⃣ Generate Firebase custom token for linking
             String firebaseToken = firebaseAuthService.generateCustomToken(spotifyUserId);
-            
-            // Return both tokens
+
+            // 4️⃣ Build combined response
             SpotifyAuthResponse response = new SpotifyAuthResponse(
-                spotifyAccessToken,
-                "Bearer",
-                firebaseToken
+                    spotifyAccessToken,
+                    "Bearer",
+                    firebaseToken
             );
-            
+
             return ResponseEntity.ok(response);
-            
+
         } catch (FirebaseAuthException e) {
             return ResponseEntity
-                .status(500)
-                .body("{\"error\": \"Firebase authentication error: " + e.getMessage() + "\"}");
+                    .status(500)
+                    .body(Map.of("error", "Firebase authentication error: " + e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity
-                .status(500)
-                .body("{\"error\": \"Server error: " + e.getMessage() + "\"}");
+                    .status(500)
+                    .body(Map.of("error", "Server error: " + e.getMessage()));
         }
     }
-    
-    // PLAYLIST TEMPLATE ENDPOINTS	
-    
-    // Get all available tamplates
+
+
+    /**
+     * Step 2 → Fetch all available playlist templates.
+     * Used by the mobile app to display mood/workout options.
+     */
     @GetMapping("/templates")
     public List<PlaylistTemplate> getTemplates() {
         return templateService.getDefaultTemplates();
     }
 
-    // Get recommended tracks based on a specific template
+    /**
+     * Step 3 → Generate recommendations based on a selected template.
+     * Uses {@link RecommendationService} to build a playlist that fits
+     * the mood, tempo, and workout type defined in the template.
+     */
     @GetMapping("/recommend/template/{name}")
-    public List<Track> getPlaylistByTemplate(
+    public ResponseEntity<?> getPlaylistByTemplate(
             @PathVariable String name,
             @RequestParam("accessToken") String accessToken
     ) {
-        PlaylistTemplate template = templateService.getDefaultTemplates()
-                .stream()
-                .filter(t -> t.getName().equalsIgnoreCase(name))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Template not found"));
+        try {
+            PlaylistTemplate template = templateService.getDefaultTemplates().stream()
+                    .filter(t -> t.getName().equalsIgnoreCase(name))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Template not found"));
 
-        return spotifyService.getRecommendationsFromTemplate(template, accessToken);
+            List<Track> recommendations = recommendationService.getRecommendationsFromTemplate(template, accessToken);
+            return ResponseEntity.ok(recommendations);
+
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(500)
+                    .body("{\"error\": \"Error getting playlist recommendations: " + e.getMessage() + "\"}");
+        }
     }
-    
-    
 }

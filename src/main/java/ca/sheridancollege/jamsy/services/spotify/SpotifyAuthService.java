@@ -1,5 +1,6 @@
 package ca.sheridancollege.jamsy.services.spotify;
 
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -11,10 +12,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MultiValueMap;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import jakarta.servlet.http.HttpSession;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 
 /*
  * Handles tokens, refreshes, and session mannagement
@@ -31,26 +37,93 @@ public class SpotifyAuthService {
     @Value("${spotify.mobile.redirect-uri}")
     private String mobileRedirectUri;
     
+    private static final String TOKEN_URL = "https://accounts.spotify.com/api/token";
+    
     private final RestTemplate restTemplate = new RestTemplate();
     
-    public String getUserAccessToken(String code, String redirectUri) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+//    public String getUserAccessToken(String code, String redirectUri) {
+//        HttpHeaders headers = new HttpHeaders();
+//        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+//
+//        String body = "grant_type=authorization_code&code=" + code +
+//                "&redirect_uri=" + redirectUri +
+//                "&client_id=" + clientId + "&client_secret=" + clientSecret;
+//
+//        HttpEntity<String> entity = new HttpEntity<>(body, headers);
+//        ResponseEntity<Map> response = restTemplate.exchange(
+//                "https://accounts.spotify.com/api/token",
+//                HttpMethod.POST, entity, Map.class);
+//
+//        return (String) response.getBody().get("access_token");
+//    }
+//
+//    public String getUserAccessToken(String code) {
+//        return getUserAccessToken(code, mobileRedirectUri);
+//    }
+    
+    /**
+     * Exchanges the Spotify authorization code for an access token and refresh token.
+     * <p>
+     * This is part of Spotify’s OAuth 2.0 flow, where the user has already granted permission
+     * and your app receives a temporary "code". You exchange that code for a long-lived access token.
+     * </p>
+     *
+     * @param code The authorization code returned by Spotify after user login.
+     * @param redirectUri The same redirect URI used during the authorization step.
+     * @return A map containing Spotify tokens (access_token, refresh_token, etc.)
+     */
+    public Map<String, Object> exchangeCodeForAccessToken(String code, String redirectUri) {
+        try {
+            // ----------------------------
+            // Step 1: Prepare request headers
+            // ----------------------------
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-        String body = "grant_type=authorization_code&code=" + code +
-                "&redirect_uri=" + redirectUri +
-                "&client_id=" + clientId + "&client_secret=" + clientSecret;
+            // ----------------------------
+            // Step 2: Prepare form data for Spotify's /api/token endpoint
+            // ----------------------------
+            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("grant_type", "authorization_code");  // Standard OAuth grant type
+            formData.add("code", code);                         // The temporary authorization code
+            formData.add("redirect_uri", redirectUri);          // Must match the one Spotify was given
+            formData.add("client_id", clientId);                // Your registered Spotify client ID
+            formData.add("client_secret", clientSecret);        // Your Spotify client secret
 
-        HttpEntity<String> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = restTemplate.exchange(
-                "https://accounts.spotify.com/api/token",
-                HttpMethod.POST, entity, Map.class);
+            // Combine headers + form data into a request entity
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(formData, headers);
 
-        return (String) response.getBody().get("access_token");
-    }
+            // ----------------------------
+            // Step 3: Make POST request to Spotify's token endpoint
+            // ----------------------------
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    "https://accounts.spotify.com/api/token", // Spotify OAuth token endpoint
+                    HttpMethod.POST,
+                    entity,
+                    Map.class
+            );
 
-    public String getUserAccessToken(String code) {
-        return getUserAccessToken(code, mobileRedirectUri);
+            // ----------------------------
+            // Step 4: Handle response and return token data
+            // ----------------------------
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                // Example response body:
+                // {
+                //   "access_token": "ABC123...",
+                //   "token_type": "Bearer",
+                //   "expires_in": 3600,
+                //   "refresh_token": "XYZ456..."
+                // }
+                return response.getBody();
+            } else {
+                throw new RuntimeException("Failed to exchange token: " + response.getStatusCode());
+            }
+
+        } catch (Exception e) {
+            // Catch and rethrow with context for debugging
+            throw new RuntimeException("Error exchanging code for access token: " + e.getMessage(), e);
+        }
     }
 
     public Map<String, String> refreshAccessToken(String refreshToken) {
