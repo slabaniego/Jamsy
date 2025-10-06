@@ -16,7 +16,11 @@ import java.util.stream.Collectors;
 public class DeezerService {
 
     private static final String DEEZER_API_URL = "https://api.deezer.com";
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+    
+    public DeezerService(RestTemplate restTemplate) {
+    	this.restTemplate = restTemplate;
+    }
 
     public List<Map<String, Object>> searchTrack(String query) {
         String url = DEEZER_API_URL + "/search?q=" + query;

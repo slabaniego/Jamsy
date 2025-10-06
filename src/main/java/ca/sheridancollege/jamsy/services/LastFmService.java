@@ -4,6 +4,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import ca.sheridancollege.jamsy.beans.Track;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 
@@ -18,10 +22,14 @@ public class LastFmService {
     @Value("${lastfm.api.key}")
     private String apiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     @Value("${lastfm.api.base-url}")
     private String baseUrl;
+    
+    public LastFmService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public List<String> getArtistGenres(String artistName) {
         try {

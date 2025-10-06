@@ -17,5 +17,6 @@ public class PlaylistTemplate {
 	 private int targetEnergy;
 	 private int targetTempo;
 	 private boolean includeExplicit;
+	 private String mood;
 
 }

@@ -1,7 +1,6 @@
 package ca.sheridancollege.jamsy.controllers;
 
 import java.util.*;
-import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,75 +9,59 @@ import org.springframework.web.bind.annotation.*;
 import ca.sheridancollege.jamsy.beans.Track;
 import ca.sheridancollege.jamsy.models.SongAction;
 import ca.sheridancollege.jamsy.repositories.SongActionRepository;
-import ca.sheridancollege.jamsy.services.DeezerService;
-import ca.sheridancollege.jamsy.services.LastFmService;
-import ca.sheridancollege.jamsy.services.MusicBrainzService;
-import ca.sheridancollege.jamsy.services.SpotifyService;
-import ca.sheridancollege.jamsy.services.DiscoveryService;
+import ca.sheridancollege.jamsy.services.*;
+import ca.sheridancollege.jamsy.services.playlist.PlaylistGeneratorService;
+import ca.sheridancollege.jamsy.services.spotify.SpotifyTrackService;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*") // Allow requests from any origin, adjust as needed
+@CrossOrigin(origins = "*") // Allow requests from any origin (adjust for security later)
 public class ApiController {
 
-    @Autowired
-    private LastFmService lastFmService;
-    
-    @Autowired
-    private DeezerService deezerService;
-    
-    @Autowired
-    private SpotifyService spotifyService;
+    @Autowired private DeezerService deezerService;
+    @Autowired private SpotifyTrackService spotifyTrackService;
+    @Autowired private DiscoveryService discoveryService;
+    @Autowired private PlaylistGeneratorService playlistGeneratorService;
+    @Autowired private SongActionRepository songActionRepo;
 
-    @Autowired
-    private DiscoveryService discoveryService;
-
-@Autowired
-    private MusicBrainzService musicBrainzService;
-    
-    @Autowired
-    private SongActionRepository songActionRepo;
-
-    
     /**
      * Handles like/unlike actions for tracks
      */
     @PostMapping("/track/action")
     public ResponseEntity<Map<String, String>> handleTrackAction(@RequestBody Map<String, Object> payload) {
         Map<String, String> response = new HashMap<>();
-        
         try {
             String isrc = (String) payload.get("isrc");
             String songName = (String) payload.get("songName");
             String artist = (String) payload.get("artist");
             String genres = (String) payload.get("genres");
             String action = (String) payload.get("action");
-            
+
             // Log the action
             System.out.println("Track " + action + ": " + songName + " by " + artist);
-            
+
             // Save to database
             SongAction songAction = new SongAction();
             songAction.setIsrc(isrc);
             songAction.setSongName(songName);
             songAction.setArtist(artist);
             songAction.setAction(action);
-            
+
             // Parse genres from comma-separated string
             if (genres != null && !genres.isEmpty()) {
                 songAction.setGenres(Arrays.asList(genres.split(",")));
             } else {
                 songAction.setGenres(new ArrayList<>());
             }
-            
+
             songActionRepo.save(songAction);
             System.out.println("✅ Saved track action to database: " + songName + " by " + artist + " (" + action + ")");
-            
+
             // Return success response
             response.put("status", "success");
             response.put("message", "Track " + action + " recorded successfully");
             return ResponseEntity.ok(response);
-            
+
         } catch (Exception e) {
             System.out.println("❌ Error saving track action: " + e.getMessage());
             e.printStackTrace();
@@ -98,29 +81,35 @@ public class ApiController {
             @RequestParam(defaultValue = "false") boolean excludeLoveSongs,
             @RequestParam(defaultValue = "false") boolean excludeFolk,
             @RequestHeader("Authorization") String authHeader) {
-        
+
         Map<String, Object> response = new HashMap<>();
         try {
             // Extract the token from the Authorization header
             String accessToken = authHeader.replace("Bearer ", "");
-            
-            // Search for tracks using SpotifyService
-            List<Track> tracks = spotifyService.searchTrack(query, accessToken, 
-                excludeExplicit, excludeLoveSongs, excludeFolk);
-            
+
+            // Search for tracks using SpotifyTrackService
+            List<Track> tracks = spotifyTrackService.searchTrack(query, accessToken);
+
+            // Apply filters for explicit/love/folk
+            tracks.removeIf(track ->
+                    (excludeExplicit && Boolean.TRUE.equals(track.isExplicit())) ||
+                    (excludeLoveSongs && track.getName().toLowerCase().contains("love")) ||
+                    (excludeFolk && track.getGenres() != null && track.getGenres().contains("folk"))
+            );
+
             // Enrich tracks with preview URLs and album covers if needed
             tracks.forEach(track -> {
                 if (track.getPreviewUrl() == null || track.getPreviewUrl().isEmpty()) {
                     String url = deezerService.getPreviewUrlFallback(track.getName(), track.getArtists());
                     track.setPreviewUrl(url);
                 }
-                
+
                 if (track.getAlbumCover() == null || track.getAlbumCover().isEmpty()) {
                     String cover = deezerService.getAlbumCoverFallback(track.getName(), track.getArtists());
                     track.setAlbumCover(cover);
                 }
             });
-            
+
             response.put("tracks", tracks);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -141,11 +130,11 @@ public class ApiController {
         try {
             @SuppressWarnings("unchecked")
             List<String> seedArtists = body != null && body.get("seedArtists") instanceof List
-                ? (List<String>) body.get("seedArtists")
-                : Arrays.asList("Drake", "Rihanna", "Eminem", "Adele", "Ed Sheeran");
+                    ? (List<String>) body.get("seedArtists")
+                    : Arrays.asList("Drake", "Rihanna", "Eminem", "Adele", "Ed Sheeran");
             String workout = body != null && body.get("workout") instanceof String
-                ? (String) body.get("workout")
-                : "general";
+                    ? (String) body.get("workout")
+                    : "general";
 
             List<Track> tracks = discoveryService.getDiscoveryTracks(seedArtists, workout, 20);
             response.put("tracks", tracks);
@@ -189,10 +178,10 @@ public class ApiController {
         Map<String, Object> response = new HashMap<>();
         try {
             System.out.println("ApiController: ===== PREVIEW PLAYLIST API CALLED =====");
-            
+
             List<SongAction> likedActions = songActionRepo.findByAction("like");
             System.out.println("ApiController: Found " + likedActions.size() + " liked actions in database");
-            
+
             List<Track> likedTracks = new ArrayList<>();
             for (SongAction action : likedActions) {
                 Track t = new Track();
@@ -200,9 +189,9 @@ public class ApiController {
                 t.setArtists(Collections.singletonList(action.getArtist()));
                 likedTracks.add(t);
             }
-            
+
             System.out.println("ApiController: Converted to " + likedTracks.size() + " liked tracks");
-            
+
             if (likedTracks.isEmpty()) {
                 System.out.println("ApiController: WARNING - No liked tracks found, returning empty playlist");
                 response.put("tracks", new ArrayList<>());
@@ -212,11 +201,11 @@ public class ApiController {
 
             List<Track> expanded = discoveryService.generateOneHourPlaylist(likedTracks, 60);
             System.out.println("ApiController: Generated " + expanded.size() + " expanded tracks");
-            
+
             // Combine original liked tracks with expanded tracks (like web version)
             List<Track> finalPlaylist = new ArrayList<>(likedTracks);
             finalPlaylist.addAll(expanded);
-            
+
             System.out.println("ApiController: Final playlist contains " + finalPlaylist.size() + " tracks");
             response.put("tracks", finalPlaylist);
             return ResponseEntity.ok(response);
@@ -242,8 +231,8 @@ public class ApiController {
             // If client provided tracks payload, prefer that; else use preview expansion of likes
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> providedTracks = body != null
-                ? (List<Map<String, Object>>) body.get("tracks")
-                : null;
+                    ? (List<Map<String, Object>>) body.get("tracks")
+                    : null;
 
             List<Track> tracksToSave = new ArrayList<>();
             if (providedTracks != null) {
@@ -269,7 +258,8 @@ public class ApiController {
                 tracksToSave = discoveryService.generateOneHourPlaylist(tracksToSave, 60);
             }
 
-            String playlistUrl = spotifyService.createPlaylist(accessToken, "My 1 Hour Mix", tracksToSave);
+            // ✅ Use PlaylistGeneratorService for playlist creation
+            String playlistUrl = playlistGeneratorService.createPlaylistWithTracks(accessToken, "My 1 Hour Mix", tracksToSave);
             response.put("playlistUrl", playlistUrl);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -277,5 +267,4 @@ public class ApiController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
 }
