@@ -46,7 +46,12 @@ public class SecurityConfig {
                     "/api/track/action",
                     // Spotify API endpoints for mobile
                     "/spotify/artists/**",
-                    "/spotify/recommend/**"
+                    "/spotify/recommend/**",
+                    "/api/spotify/artists/**",
+                    "/api/spotify/recommend/**",
+                    "/api/spotify/templates",
+                    "/api/spotify/preview-playlist",
+                    "/api/spotify/create-playlist"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

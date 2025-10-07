@@ -130,59 +130,33 @@ public class SpotifyApiController {
 	        String accessToken = authHeader.replace("Bearer ", "").trim();
 	        System.out.println("🎧 Mobile API → Getting artists for workout: " + workout + ", mood: " + mood);
 
-	        // 1️⃣ Fetch user's top tracks (we no longer use SpotifyService, so use SpotifyUserService)
-	        List<Track> userTopTracks = spotifyUserService.getTopTracks(accessToken);
-
-	        if (userTopTracks == null || userTopTracks.isEmpty()) {
-	            System.out.println("⚠️ No top tracks found for user. Returning empty artist list.");
+	        // 1️⃣ Use the SAME approach as web - fetch top artists with categorization
+	        // This includes fallbacks to Last.fm and works despite rate limiting
+	        List<Map<String, Object>> categorizedArtists = spotifyArtistService.getUserTopArtistsWithWorkoutCategories(accessToken, 200);
+	        
+	        if (categorizedArtists == null || categorizedArtists.isEmpty()) {
+	            System.out.println("⚠️ No categorized artists available. Returning empty list.");
 	            response.put("artists", Collections.emptyList());
 	            return ResponseEntity.ok(response);
 	        }
-
-	        // 2️⃣ Extract unique artist names from top tracks
-	        List<String> artistNames = userTopTracks.stream()
-	                .flatMap(track -> track.getArtists().stream())
-	                .distinct()
-	                .limit(50)
-	                .toList();
-
-	        System.out.println("✅ Extracted " + artistNames.size() + " unique artists from top tracks.");
-
-	        // 3️⃣ Fetch artist details from SpotifyArtistService
-	        List<Map<String, Object>> artistDetails = spotifyArtistService.getArtistNames(artistNames, accessToken);
-
-	        // 4️⃣ Add light categorization for workouts (like the web version)
-	        for (Map<String, Object> artist : artistDetails) {
-	            @SuppressWarnings("unchecked")
-	            List<String> genres = (List<String>) artist.get("genres");
-	            if (genres == null) genres = new ArrayList<>();
-
-	            String genreStr = String.join(",", genres).toLowerCase();
-	            List<String> workoutCategories = new ArrayList<>();
-
-	            if (genreStr.contains("pop") || genreStr.contains("dance") || genreStr.contains("edm")) {
-	                workoutCategories.add("Cardio");
-	            }
-	            if (genreStr.contains("rock") || genreStr.contains("metal") || genreStr.contains("hip hop")) {
-	                workoutCategories.add("Strength Training");
-	            }
-	            if (genreStr.contains("chill") || genreStr.contains("ambient") || genreStr.contains("acoustic")) {
-	                workoutCategories.add("Yoga");
-	            }
-
-	            artist.put("workoutCategories", workoutCategories);
-	        }
-
-	        // 5️⃣ Filter by workout
-	        List<Map<String, Object>> filteredArtists = artistDetails.stream()
+	        
+	        System.out.println("✅ Retrieved " + categorizedArtists.size() + " categorized artists from top artists endpoint");
+	        
+	        // 2️⃣ Artists are already categorized by getUserTopArtistsWithWorkoutCategories()
+	        // No need to re-categorize - they already have workoutCategories field
+	        
+	        // 3️⃣ Filter by workout and create mutable list
+	        List<Map<String, Object>> filteredArtists = new ArrayList<>(
+	            categorizedArtists.stream()
 	                .filter(a -> {
 	                    @SuppressWarnings("unchecked")
 	                    List<String> cats = (List<String>) a.get("workoutCategories");
 	                    return cats != null && cats.contains(workout);
 	                })
-	                .toList();
+	                .toList()
+	        );
 
-	        // 6️⃣ Shuffle and limit to 20
+	        // 4️⃣ Shuffle and limit to 20
 	        Collections.shuffle(filteredArtists);
 	        List<Map<String, Object>> selected = filteredArtists.stream().limit(20).toList();
 
@@ -270,6 +244,79 @@ public class SpotifyApiController {
 	        return ResponseEntity.status(500).body(Map.of(
 	                "status", "error",
 	                "message", "Error creating playlist: " + e.getMessage()
+	        ));
+	    }
+	}
+	
+	/**
+	 * Step 4.5 → Preview expanded playlist (mobile version of /preview-playlist)
+	 * Takes liked tracks and expands them to ~1 hour playlist
+	 */
+	@PostMapping("/preview-playlist")
+	public ResponseEntity<?> previewPlaylist(
+	        @RequestHeader("Authorization") String authHeader,
+	        @RequestBody Map<String, Object> body
+	) {
+	    try {
+	        String accessToken = authHeader.replace("Bearer ", "").trim();
+	        
+	        @SuppressWarnings("unchecked")
+	        List<Map<String, Object>> likedTracksData = (List<Map<String, Object>>) body.get("likedTracks");
+	        
+	        if (likedTracksData == null || likedTracksData.isEmpty()) {
+	            return ResponseEntity.badRequest().body(Map.of(
+	                "error", "No liked tracks provided",
+	                "tracks", Collections.emptyList()
+	            ));
+	        }
+	        
+	        // Convert to Track objects
+	        List<Track> likedTracks = new ArrayList<>();
+	        for (Map<String, Object> t : likedTracksData) {
+	            Track track = new Track();
+	            track.setId((String) t.get("id"));
+	            track.setName((String) t.get("name"));
+	            track.setArtists((List<String>) t.get("artists"));
+	            track.setAlbumCover((String) t.get("albumCover"));
+	            track.setPreviewUrl((String) t.get("previewUrl"));
+	            track.setImageUrl((String) t.get("imageUrl"));
+	            track.setArtistName((String) t.get("artistName"));
+	            if (t.get("durationMs") != null) {
+	                track.setDurationMs(((Number) t.get("durationMs")).intValue());
+	            }
+	            likedTracks.add(track);
+	        }
+	        
+	        System.out.println("📋 Received " + likedTracks.size() + " liked tracks for preview");
+	        
+	        // For now, just return the liked tracks
+	        // TODO: Implement expansion logic using DiscoveryService.generateOneHourPlaylist()
+	        
+	        // Convert back to JSON format
+	        List<Map<String, Object>> response = new ArrayList<>();
+	        for (Track track : likedTracks) {
+	            Map<String, Object> trackMap = new HashMap<>();
+	            trackMap.put("id", track.getId());
+	            trackMap.put("name", track.getName());
+	            trackMap.put("artists", track.getArtists() != null ? track.getArtists() : 
+	                Collections.singletonList(track.getArtistName()));
+	            trackMap.put("albumCover", track.getAlbumCover());
+	            trackMap.put("imageUrl", track.getImageUrl());
+	            trackMap.put("previewUrl", track.getPreviewUrl());
+	            trackMap.put("durationMs", track.getDurationMs());
+	            response.add(trackMap);
+	        }
+	        
+	        return ResponseEntity.ok(Map.of(
+	                "tracks", response,
+	                "totalTracks", response.size()
+	        ));
+	        
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        return ResponseEntity.status(500).body(Map.of(
+	                "error", "Error generating preview: " + e.getMessage(),
+	                "tracks", Collections.emptyList()
 	        ));
 	    }
 	}
