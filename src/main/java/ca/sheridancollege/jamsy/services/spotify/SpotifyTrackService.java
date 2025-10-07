@@ -291,6 +291,7 @@ public class SpotifyTrackService {
     
     
 	/* Audio Features */
+    /*
     public Map<String, Double> getArtistAudioFeatures(String accessToken, String artistId) {
         try {
             // Get artist's top tracks
@@ -324,7 +325,7 @@ public class SpotifyTrackService {
         
         throw new RuntimeException("No audio features available");
     }
-    
+    /*
     private Map<String, Double> getAverageAudioFeatures(String accessToken, List<String> trackIds) {
         if (trackIds.isEmpty()) {
             throw new RuntimeException("No track IDs provided");
@@ -358,8 +359,9 @@ public class SpotifyTrackService {
         }
         
         throw new RuntimeException("No audio features data received");
-    }
+    }*/
 
+    /*
     private Map<String, Map<String, Double>> getArtistsAudioFeatures(String accessToken, List<String> artistIds) {
         Map<String, Map<String, Double>> artistFeatures = new HashMap<>();
         
@@ -426,5 +428,5 @@ public class SpotifyTrackService {
         }
         
         return averages;
-    }
+    }*/
 }

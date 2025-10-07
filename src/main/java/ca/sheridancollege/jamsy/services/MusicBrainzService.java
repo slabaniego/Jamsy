@@ -129,6 +129,7 @@ public class MusicBrainzService {
     /**
      * Get genres for a specific artist from MusicBrainz
      */
+    /*
     public List<String> getArtistGenres(String artistName) {
         try {
             // First, search for the artist
@@ -176,7 +177,7 @@ public class MusicBrainzService {
         }
         
         return Collections.emptyList();
-    }
+    }*/
 
     /**
      * Get detailed artist info including genres from MusicBrainz

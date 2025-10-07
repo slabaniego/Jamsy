@@ -63,12 +63,6 @@ public class LastFmService {
 
     public List<String> getSimilarArtists(String artistName, int limit) {
         try {
-            // Add null check to prevent the "Cannot invoke String.length() because s is null" error
-            if (artistName == null || artistName.trim().isEmpty()) {
-                System.out.println("❌ Error getting similar artists: artistName is null or empty");
-                return Collections.emptyList();
-            }
-            
             String url = baseUrl + "?method=artist.getSimilar&artist=" +
                     URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
                     "&api_key=" + apiKey + "&format=json&limit=" + limit;
@@ -94,6 +88,7 @@ public class LastFmService {
         }
         return Collections.emptyList();
     }
+
 
     public List<Track> getArtistTopTracks(String artistName, int limit) {
         try {
@@ -168,17 +163,11 @@ public class LastFmService {
     // Similar tracks 
     public List<Track> getSimilarTracks(String trackName, String artistName, int limit) {
         try {
-            // Add null checks to prevent the "Cannot invoke String.length() because s is null" error
-            if (trackName == null || artistName == null || trackName.trim().isEmpty() || artistName.trim().isEmpty()) {
-                System.out.println("❌ Error getting similar tracks: trackName or artistName is null or empty");
-                return Collections.emptyList();
-            }
-            
             String url = baseUrl + "?method=track.getSimilar" +
                     "&artist=" + URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
                     "&track=" + URLEncoder.encode(trackName, StandardCharsets.UTF_8) +
                     "&api_key=" + apiKey +
-                    "&format=json&limit=" + limit;
+                    "&format=json&limit=" + (limit + 20); // Get extra for obscurity filtering
 
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
 
@@ -190,9 +179,19 @@ public class LastFmService {
                         List<Map<String, Object>> trackList =
                                 (List<Map<String, Object>>) similarTracks.get("track");
 
-                        return trackList.stream().map(trackMap -> {
+                        List<Track> allTracks = trackList.stream().map(trackMap -> {
                             Track track = new Track();
                             track.setName((String) trackMap.get("name"));
+                            track.setSeedTrackName(trackName);
+                            track.setSeedArtistName(artistName);
+
+                            // Get match score for vibe matching
+                            if (trackMap.containsKey("match")) {
+                                Number match = (Number) trackMap.get("match");
+                                track.setMatchScore(match != null ? match.floatValue() : 0.0f);
+                            } else {
+                                track.setMatchScore(0.0f);
+                            }
 
                             // Artist info
                             if (trackMap.containsKey("artist")) {
@@ -202,6 +201,14 @@ public class LastFmService {
                                     track.setArtistName(aName);
                                     track.setArtists(Collections.singletonList(aName));
                                 }
+                            }
+
+                            // Duration
+                            if (trackMap.containsKey("duration")) {
+                                Number duration = (Number) trackMap.get("duration");
+                                track.setDurationMs(duration != null ? duration.intValue() * 1000 : 180000);
+                            } else {
+                                track.setDurationMs(180000);
                             }
 
                             // Album image
@@ -220,15 +227,91 @@ public class LastFmService {
                             }
 
                             return track;
-                        }).limit(limit).collect(Collectors.toList());
+                        }).collect(Collectors.toList());
+
+                        // Filter for obscure artists and good matches
+                        return filterForObscureArtists(allTracks, limit);
                     }
                 }
             }
         } catch (Exception e) {
-            System.out.println("❌ Error getting similar tracks: " + e.getMessage());
+            System.out.println("❌ Error getting similar tracks for " + trackName + " by " + artistName + ": " + e.getMessage());
         }
         return Collections.emptyList();
     }
+
+    private List<Track> filterForObscureArtists(List<Track> tracks, int limit) {
+        List<Track> obscureTracks = new ArrayList<>();
+        
+        for (Track track : tracks) {
+            if (obscureTracks.size() >= limit) break;
+            
+            if (isArtistObscure(track.getArtistName())) {
+                obscureTracks.add(track);
+                System.out.println("✅ Found obscure track: " + track.getName() + " by " + track.getArtistName());
+            } else {
+                System.out.println("❌ Filtered out popular artist: " + track.getArtistName());
+            }
+        }
+        
+        return obscureTracks;
+    }
+
+    public boolean isArtistObscure(String artistName) {
+        try {
+            // Use Last.fm artist.getInfo to check listener count and popularity
+            String url = baseUrl + "?method=artist.getInfo" +
+                    "&artist=" + URLEncoder.encode(artistName, StandardCharsets.UTF_8) +
+                    "&api_key=" + apiKey +
+                    "&format=json";
+
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                Map<String, Object> body = response.getBody();
+                if (body != null && body.containsKey("artist")) {
+                    Map<String, Object> artistInfo = (Map<String, Object>) body.get("artist");
+                    
+                    // Check listener count - artists with less than 500,000 listeners are considered obscure
+                    if (artistInfo.containsKey("stats")) {
+                        Map<String, Object> stats = (Map<String, Object>) artistInfo.get("stats");
+                        if (stats.containsKey("listeners")) {
+                            String listenerCountStr = (String) stats.get("listeners");
+                            try {
+                                int listenerCount = Integer.parseInt(listenerCountStr);
+                                // Consider artists with less than 500,000 listeners as obscure
+                                boolean isObscure = listenerCount < 500000;
+                                System.out.println("🎵 Artist: " + artistName + " - Listeners: " + listenerCount + " - Obscure: " + isObscure);
+                                return isObscure;
+                            } catch (NumberFormatException e) {
+                                System.out.println("❌ Could not parse listener count for: " + artistName);
+                            }
+                        }
+                    }
+                    
+                    // Additional check: if playcount is very high, likely popular
+                    if (artistInfo.containsKey("stats") && ((Map<String, Object>) artistInfo.get("stats")).containsKey("playcount")) {
+                        String playCountStr = (String) ((Map<String, Object>) artistInfo.get("stats")).get("playcount");
+                        try {
+                            long playCount = Long.parseLong(playCountStr);
+                            if (playCount > 10000000) { // More than 10 million plays
+                                System.out.println("❌ High playcount artist: " + artistName + " - Plays: " + playCount);
+                                return false;
+                            }
+                        } catch (NumberFormatException e) {
+                            // Continue to other checks
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("❌ Error checking artist obscurity for: " + artistName + " - " + e.getMessage());
+        }
+        
+        // If we can't determine, assume it's not obscure to be safe
+        return false;
+    }
+
 
 
     public boolean artistMatchesWorkout(String artistName, String workout) {

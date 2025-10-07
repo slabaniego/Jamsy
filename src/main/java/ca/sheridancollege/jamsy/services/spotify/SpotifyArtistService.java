@@ -275,14 +275,9 @@ public class SpotifyArtistService {
                         
                         // Try audio features first, fallback to genre analysis if 403
                         List<String> workoutCategories;
-                        try {
-                            Map<String, Double> features = spotifyTrackService.getArtistAudioFeatures(accessToken, artistId);
-                            workoutCategories = analyzeAudioFeaturesForWorkout(features, artistName);
-                        } catch (Exception e) {
-                            // Fallback to genre-based analysis
-                            System.out.println("🔄 Falling back to genre analysis for: " + artistName);
-                            workoutCategories = determineWorkoutCategoriesFromGenres(artistName);
-                        }
+                        
+                        workoutCategories = determineWorkoutCategoriesFromGenres(artistName);
+                        
                         
                         artistInfo.put("workoutCategories", workoutCategories);
                         categorizedArtists.add(artistInfo);
@@ -378,20 +373,7 @@ public class SpotifyArtistService {
             System.out.println("⚠️ Last.fm genre lookup failed for " + artistName);
         }
         
-        // 2. Try MusicBrainz (if available)
-        if (musicBrainzService != null) {
-            try {
-                List<String> musicBrainzGenres = musicBrainzService.getArtistGenres(artistName);
-                if (musicBrainzGenres != null && !musicBrainzGenres.isEmpty()) {
-                    allGenres.addAll(musicBrainzGenres);
-                    System.out.println("✅ Found MusicBrainz genres for " + artistName + ": " + musicBrainzGenres);
-                }
-            } catch (Exception e) {
-                System.out.println("⚠️ MusicBrainz genre lookup failed for " + artistName);
-            }
-        } else {
-            System.out.println("⚠️ MusicBrainzService is not available");
-        }
+        
         
         // 3. Use categorizeGenres if we have data
         if (!allGenres.isEmpty()) {
@@ -485,14 +467,8 @@ public class SpotifyArtistService {
             if (lastFmGenres != null && !lastFmGenres.isEmpty()) {
                 genres = lastFmGenres;
                 System.out.println("✅ Retrieved genres from Last.fm for " + artistName + ": " + genres);
-            } else {
-                // Try MusicBrainz as second fallback
-                List<String> musicBrainzGenres = musicBrainzService.getArtistGenres(artistName);
-                if (musicBrainzGenres != null && !musicBrainzGenres.isEmpty()) {
-                    genres = musicBrainzGenres;
-                    System.out.println("✅ Retrieved genres from MusicBrainz for " + artistName + ": " + genres);
-                }
-            }
+            } 
+            
         }
         
         if (genres == null || genres.isEmpty()) {

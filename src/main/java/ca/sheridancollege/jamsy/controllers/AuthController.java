@@ -83,7 +83,7 @@ public class AuthController {
 
             // Load categorized top artists for workout/mood playlists
             List<Map<String, Object>> categorizedArtists =
-                    spotifyArtistService.getUserTopArtistsWithWorkoutCategories(accessToken, 200);
+                    spotifyArtistService.getUserTopArtistsWithWorkoutCategories(accessToken, 100);
             session.setAttribute("categorizedArtists", categorizedArtists);
 
             // Load default playlist templates

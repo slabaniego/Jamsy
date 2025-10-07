@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 import java.util.List;
 
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,4 +28,7 @@ public class Track implements Serializable {
     private String artistName;
     private String imageUrl;
     private int durationMs;
+    private float matchScore;
+    private String seedTrackName;   
+    private String seedArtistName;
 }
