@@ -223,13 +223,66 @@ public class DiscoveryService {
         }
     }
     
+    /**
+     * Helper method → fetch additional lesser-known tracks
+     * Used when playlist doesn’t reach the minimum song count.
+     */
+    private void getMoreObscureTracks(
+            List<Track> likedTracks,
+            List<Track> finalPlaylist,
+            Set<String> addedTrackKeys,
+            Map<String, Integer> artistCount,
+            int neededCount,
+            Set<String> likedTrackKeys
+    ) {
+        System.out.println("🔎 Trying to fetch more obscure tracks (" + neededCount + " needed)");
+
+        // Use Last.fm again but with lower popularity filter or broader pool
+        for (Track liked : likedTracks) {
+            System.out.println("🌀 Getting obscure tracks for: " + liked.getName());
+
+            List<Track> obscureTracks = lastFmService.getSimilarTracks(
+                liked.getName(),
+                liked.getArtistName(),
+                50 // larger sample to catch less popular matches
+            );
+
+            for (Track candidate : obscureTracks) {
+                if (finalPlaylist.size() >= neededCount) {
+                    System.out.println("✅ Filled obscure track quota");
+                    return;
+                }
+
+                String artistKey = candidate.getArtistName() != null
+                    ? candidate.getArtistName().toLowerCase()
+                    : "unknown";
+
+                String trackKey = candidate.getName().toLowerCase() + "|" + artistKey;
+
+                // Skip if already liked or added
+                if (likedTrackKeys.contains(trackKey) || addedTrackKeys.contains(trackKey)) continue;
+
+                int currentArtistCount = artistCount.getOrDefault(artistKey, 0);
+                if (currentArtistCount >= 2) continue;
+
+                finalPlaylist.add(candidate);
+                addedTrackKeys.add(trackKey);
+                artistCount.put(artistKey, currentArtistCount + 1);
+
+                System.out.println("➕ Added obscure: " + candidate.getName() + " by " + candidate.getArtistName());
+            }
+        }
+
+        System.out.println("⚠️ Done adding obscure tracks. Final size: " + finalPlaylist.size());
+    }
+
     
-    /*UPDATED ATIN START*/
-	/* Extended playlist ( final result ) */
+    /* UPDATED ATIN START */
+    /* Extended playlist (final result) */
     public List<Track> generateOneHourPlaylist(List<Track> likedTracks, int targetMinutes) {
-    	
-    	System.out.println("Inside the generate playlist method");
-        
+
+        System.out.println("Inside the generate playlist method");
+
         // Fetch user history
         List<SongAction> likedSongs = songActionRepo.findByAction("like");
         List<SongAction> skippedSongs = songActionRepo.findByAction("skip");
@@ -241,155 +294,120 @@ public class DiscoveryService {
         Set<String> skippedKeys = skippedSongs.stream()
             .map(s -> s.getSongName().toLowerCase() + "|" + s.getArtist().toLowerCase())
             .collect(Collectors.toSet());
-        
+
         System.out.println("🧠 Loaded preferences: " + likedKeys.size() + " liked, " + skippedKeys.size() + " skipped");
 
         int targetMs = targetMinutes * 60 * 1000;
         int minSongs = 50; // Minimum 50 songs
-        
+
         System.out.println("🎵 Starting playlist generation with " + likedTracks.size() + " liked tracks");
         System.out.println("🎯 Target: " + minSongs + " songs, " + targetMinutes + " minutes");
-        
+
         // Create sets for tracking - EXCLUDE LIKED TRACKS
         Set<String> likedTrackKeys = likedTracks.stream()
                 .map(t -> t.getName().toLowerCase() + "|" + t.getArtistName().toLowerCase())
                 .collect(Collectors.toSet());
-        
-        Set<String> addedTrackKeys = new HashSet<>(); // DO NOT include liked tracks
+
+        Set<String> addedTrackKeys = new HashSet<>();
         Map<String, Integer> artistCount = new HashMap<>();
-        
+
         // Step 1: Get similar tracks ONLY for the liked tracks
         List<Track> similarPool = new ArrayList<>();
         Set<String> processedSeeds = new HashSet<>();
-        
+
         for (Track likedTrack : likedTracks) {
             String seedKey = likedTrack.getName().toLowerCase() + "|" + likedTrack.getArtistName().toLowerCase();
-            if (!processedSeeds.add(seedKey)) {
-                continue; // Skip duplicate seeds
-            }
-            
+            if (!processedSeeds.add(seedKey)) continue; // skip duplicates
+
             System.out.println("🔍 Finding similar tracks for: " + likedTrack.getName() + " by " + likedTrack.getArtistName());
-            
+
             List<Track> similarTracks = lastFmService.getSimilarTracks(
-                likedTrack.getName(), 
-                likedTrack.getArtistName(), 
-                25 // Get more to account for obscurity filtering
+                likedTrack.getName(),
+                likedTrack.getArtistName(),
+                25
             );
-            
+
             System.out.println("📊 Found " + similarTracks.size() + " similar tracks for " + likedTrack.getName());
-            
-            // Filter out duplicates and tracks already in liked songs
+
             for (Track similar : similarTracks) {
                 String trackKey = similar.getName().toLowerCase() + "|" + similar.getArtistName().toLowerCase();
-                
-                if (!likedTrackKeys.contains(trackKey) && !addedTrackKeys.contains(trackKey)) {
+
+                // Skip already liked or skipped songs
+                if (skippedKeys.contains(trackKey)) continue;
+                if (likedTrackKeys.contains(trackKey)) continue;
+
+                if (!addedTrackKeys.contains(trackKey)) {
                     similarPool.add(similar);
                 }
             }
         }
-        
+
         System.out.println("📊 Total similar pool: " + similarPool.size() + " tracks");
-        
-        // Step 2: Remove duplicates from similar pool
+
+        // Step 2: Remove duplicates
         Set<String> poolKeys = new HashSet<>();
         List<Track> uniqueSimilarPool = similarPool.stream()
-                .filter(t -> {
-                    String key = t.getName().toLowerCase() + "|" + t.getArtistName().toLowerCase();
-                    return poolKeys.add(key);
-                })
-                .collect(Collectors.toList());
-        
+            .filter(t -> poolKeys.add(t.getName().toLowerCase() + "|" + t.getArtistName().toLowerCase()))
+            .collect(Collectors.toList());
+
         System.out.println("📊 After deduplication: " + uniqueSimilarPool.size() + " unique similar tracks");
-        
+
         // Step 3: Sort by match score (best matches first)
         uniqueSimilarPool.sort(Comparator.comparing(Track::getMatchScore).reversed());
-        
-        // Step 4: Build final playlist - DO NOT INCLUDE LIKED TRACKS
-        List<Track> finalPlaylist = new ArrayList<>(); // Start empty - no liked tracks!
+
+        // Step 4: Build final playlist
+        List<Track> finalPlaylist = new ArrayList<>();
         int totalDuration = 0;
-        
-        // Step 5: Add similar tracks that match our criteria
+
         for (Track candidate : uniqueSimilarPool) {
-            // Stop if we have enough songs AND duration
-            if (finalPlaylist.size() >= minSongs && totalDuration >= targetMs) {
-                break;
-            }
-            
+            if (finalPlaylist.size() >= minSongs && totalDuration >= targetMs) break;
+
             String artistKey = candidate.getArtistName().toLowerCase();
             String trackKey = candidate.getName().toLowerCase() + "|" + artistKey;
-            
-            // Skip if already added
-            if (addedTrackKeys.contains(trackKey)) {
-                continue;
-            }
-            
-            // Check artist limit (max 2 per artist)
+
+            if (addedTrackKeys.contains(trackKey)) continue;
+
             int currentArtistCount = artistCount.getOrDefault(artistKey, 0);
-            if (currentArtistCount >= 2) {
-                continue;
-            }
-            
-            // Add the track
+            if (currentArtistCount >= 2) continue;
+
             finalPlaylist.add(candidate);
             addedTrackKeys.add(trackKey);
             artistCount.put(artistKey, currentArtistCount + 1);
             totalDuration += candidate.getDurationMs() > 0 ? candidate.getDurationMs() : 180000;
-            
+
             System.out.println("✅ Added to playlist: " + candidate.getName() + " by " + candidate.getArtistName());
         }
-        
-        // Step 6: If we still don't have enough songs, try different approach
+
+        // Step 5: If we still don't have enough songs, try different approach
         if (finalPlaylist.size() < minSongs) {
             System.out.println("🔄 Need more songs, current: " + finalPlaylist.size() + ", target: " + minSongs);
-            getMoreObscureTracks(likedTracks, finalPlaylist, addedTrackKeys, artistCount, minSongs - finalPlaylist.size(), likedTrackKeys);
+            getMoreObscureTracks(likedTracks, finalPlaylist, addedTrackKeys, artistCount,
+                    minSongs - finalPlaylist.size(), likedTrackKeys);
         }
-        
+
+        // ✅ Add some familiar liked tracks back (optional 30–50%)
+        List<Track> likedTrackObjs = likedSongs.stream()
+            .map(s -> {
+                Track t = new Track();
+                t.setName(s.getSongName());
+                t.setArtists(Collections.singletonList(s.getArtist()));
+                return t;
+            })
+            .limit(10) // or likedTracks.size() / 2 dynamically
+            .collect(Collectors.toList());
+
+        finalPlaylist.addAll(likedTrackObjs);
+        System.out.println("💖 Added " + likedTrackObjs.size() + " familiar liked tracks for continuity");
+
         // Final shuffle for variety
         Collections.shuffle(finalPlaylist);
-        
+
         System.out.println("🎉 Final playlist: " + finalPlaylist.size() + " similar tracks (NO LIKED TRACKS)");
         System.out.println("⏱️  Total duration: " + (totalDuration / 60000) + " minutes");
-        
+
         return finalPlaylist;
     }
 
-    private void getMoreObscureTracks(List<Track> likedTracks, List<Track> finalPlaylist, 
-                                     Set<String> addedTrackKeys, Map<String, Integer> artistCount, 
-                                     int needed, Set<String> likedTrackKeys) {
-        if (needed <= 0) return;
-        
-        System.out.println("🔍 Getting " + needed + " more obscure tracks...");
-        
-        // Try getting tracks by tags or other methods to find obscure artists
-        for (Track likedTrack : likedTracks) {
-            if (needed <= 0) break;
-            
-            // Try getting top tracks from similar obscure artists
-            List<Track> artistBasedTracks = getTracksFromSimilarObscureArtists(likedTrack, needed * 2, likedTrackKeys);
-            
-            for (Track candidate : artistBasedTracks) {
-                if (needed <= 0) break;
-                
-                String artistKey = candidate.getArtistName().toLowerCase();
-                String trackKey = candidate.getName().toLowerCase() + "|" + artistKey;
-                
-                // Skip if already added, in liked tracks, or artist limit reached
-                if (addedTrackKeys.contains(trackKey) || 
-                    likedTrackKeys.contains(trackKey) ||
-                    artistCount.getOrDefault(artistKey, 0) >= 2) {
-                    continue;
-                }
-                
-                // Add the track
-                finalPlaylist.add(candidate);
-                addedTrackKeys.add(trackKey);
-                artistCount.put(artistKey, artistCount.getOrDefault(artistKey, 0) + 1);
-                needed--;
-                
-                System.out.println("✅ Added extra obscure: " + candidate.getName() + " by " + candidate.getArtistName());
-            }
-        }
-    }
 
     private List<Track> getTracksFromSimilarObscureArtists(Track seed, int limit, Set<String> likedTrackKeys) {
         List<Track> tracks = new ArrayList<>();

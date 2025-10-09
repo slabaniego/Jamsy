@@ -163,7 +163,6 @@ public class WebController {
         session.removeAttribute("selectedWorkout");
         session.removeAttribute("selectedMood");
         session.removeAttribute("discoveryTracks");
-        return "redirect:/playlist-templates"; // or wherever the first step starts
+        return "redirect:/playlist-templates";
     }
-
 }
