@@ -7,6 +7,16 @@
     </form>
 </div>
 
+<div class="actions" style="text-align:center; margin-top: 20px;">
+	
+	<form th:action="@{/discover/restart}" method="get">
+        <button type="submit" class="submit-btn">Start Over</button>
+    </form>
+<!--     <a href="/discover/restart" class="btn btn-outline-danger">
+        Start Over
+    </a> -->
+</div>
+
 <style>
 body {
     font-family: 'Poppins', sans-serif;

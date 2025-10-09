@@ -267,4 +267,15 @@ public class ApiController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+    
+    /*
+     * Restart flow - 2025/10/09
+     */
+    @PostMapping("/restart")
+    public ResponseEntity<Map<String, String>> restartFlow() {
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Discovery flow reset successfully. You can start over.");
+        return ResponseEntity.ok(response);
+    }
 }

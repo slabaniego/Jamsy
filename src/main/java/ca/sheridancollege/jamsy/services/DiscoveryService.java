@@ -1,6 +1,9 @@
 package ca.sheridancollege.jamsy.services;
 
 import ca.sheridancollege.jamsy.beans.Track;
+import ca.sheridancollege.jamsy.models.SongAction;
+import ca.sheridancollege.jamsy.repositories.SongActionRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +31,9 @@ public class DiscoveryService {
     
     @Value("${lastfm.api.key}")
     private String apiKey;
+    
+    @Autowired
+    private SongActionRepository songActionRepo;
 
     @Autowired
     public DiscoveryService(LastFmService lastFmService) {
@@ -223,6 +229,21 @@ public class DiscoveryService {
     public List<Track> generateOneHourPlaylist(List<Track> likedTracks, int targetMinutes) {
     	
     	System.out.println("Inside the generate playlist method");
+        
+        // Fetch user history
+        List<SongAction> likedSongs = songActionRepo.findByAction("like");
+        List<SongAction> skippedSongs = songActionRepo.findByAction("skip");
+
+        Set<String> likedKeys = likedSongs.stream()
+            .map(s -> s.getSongName().toLowerCase() + "|" + s.getArtist().toLowerCase())
+            .collect(Collectors.toSet());
+
+        Set<String> skippedKeys = skippedSongs.stream()
+            .map(s -> s.getSongName().toLowerCase() + "|" + s.getArtist().toLowerCase())
+            .collect(Collectors.toSet());
+        
+        System.out.println("🧠 Loaded preferences: " + likedKeys.size() + " liked, " + skippedKeys.size() + " skipped");
+
         int targetMs = targetMinutes * 60 * 1000;
         int minSongs = 50; // Minimum 50 songs
         
