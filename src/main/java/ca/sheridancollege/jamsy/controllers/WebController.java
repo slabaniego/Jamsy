@@ -152,4 +152,17 @@ public class WebController {
             return "error";
         }
     }
+    
+    /*
+     * Restart flow - button to restart the the process if
+     * user doesn't like the results
+     */
+    @GetMapping("/restart")
+    public String restartDiscovery(HttpSession session) {
+        session.removeAttribute("selectedArtists");
+        session.removeAttribute("selectedWorkout");
+        session.removeAttribute("selectedMood");
+        session.removeAttribute("discoveryTracks");
+        return "redirect:/playlist-templates";
+    }
 }
